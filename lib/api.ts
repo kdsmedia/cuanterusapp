@@ -2,6 +2,8 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
+  GoogleAuthProvider,
+  signInWithCredential,
 } from 'firebase/auth';
 import {
   doc,
@@ -149,6 +151,70 @@ export async function registerUser(
 
 export async function loginUser(email: string, password: string) {
   await signInWithEmailAndPassword(auth, email, password);
+}
+
+/** Login via Google - returns { isNewUser, needsProfile } */
+export async function loginWithGoogle(idToken: string): Promise<{
+  isNewUser: boolean;
+  needsProfile: boolean;
+}> {
+  const credential = GoogleAuthProvider.credential(idToken);
+  const result = await signInWithCredential(auth, credential);
+  const user = result.user;
+
+  // Cek apakah user sudah punya profil di Firestore
+  const userRef = doc(db, USERS_PATH, user.uid);
+  const snap = await getDoc(userRef);
+
+  if (!snap.exists()) {
+    // User baru via Google — buat dokumen dasar
+    await setDoc(userRef, {
+      email: user.email || '',
+      name: user.displayName || '',
+      phone: '',
+      balance: 0,
+      totalEarned: 0,
+      referralCode: user.uid.slice(0, 8).toUpperCase(),
+      referredBy: '',
+      loginMethod: 'google',
+      profileComplete: false,
+      blocked: false,
+      createdAt: serverTimestamp(),
+    });
+    return { isNewUser: true, needsProfile: true };
+  }
+
+  const data = snap.data();
+  // User lama tapi profil belum lengkap
+  if (!data.profileComplete && data.loginMethod === 'google') {
+    return { isNewUser: false, needsProfile: true };
+  }
+
+  return { isNewUser: false, needsProfile: false };
+}
+
+/** Lengkapi profil user Google */
+export async function completeGoogleProfile(
+  uid: string,
+  data: {
+    name: string;
+    phone: string;
+    ewalletId: string;
+    ewalletName: string;
+    ewalletOwner: string;
+    ewalletNumber: string;
+  }
+): Promise<void> {
+  const userRef = doc(db, USERS_PATH, uid);
+  await updateDoc(userRef, {
+    name: data.name,
+    phone: data.phone,
+    ewalletId: data.ewalletId,
+    ewalletName: data.ewalletName,
+    ewalletOwner: data.ewalletOwner,
+    ewalletNumber: data.ewalletNumber,
+    profileComplete: true,
+  });
 }
 
 export async function logoutUser() {

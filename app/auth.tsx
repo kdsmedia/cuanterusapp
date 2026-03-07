@@ -11,13 +11,18 @@ import {
   Platform,
   Modal,
   FlatList,
+  ActivityIndicator,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { registerUser, loginUser } from '@/lib/api';
-import { ADMIN_EMAIL } from '@/lib/firebase';
-import { auth } from '@/lib/firebase';
+import * as Google from 'expo-auth-session/providers/google';
+import * as WebBrowser from 'expo-web-browser';
+import { registerUser, loginUser, loginWithGoogle, completeGoogleProfile } from '@/lib/api';
+import { ADMIN_EMAIL, ADMIN_PHONE, GOOGLE_WEB_CLIENT_ID, auth } from '@/lib/firebase';
 import PrimaryButton from '@/components/PrimaryButton';
 import { colors } from '@/lib/theme';
+
+WebBrowser.maybeCompleteAuthSession();
 
 // ===== DAFTAR E-WALLET =====
 const EWALLET_OPTIONS = [
@@ -49,10 +54,21 @@ function phoneToEmail(phone: string): string {
   return `${clean}@cuanterus.app`;
 }
 
+// Cek apakah email adalah admin
+function isAdminEmail(email: string): boolean {
+  const e = email.toLowerCase();
+  const adminVirtual = `${ADMIN_PHONE}@cuanterus.app`.toLowerCase();
+  return e === ADMIN_EMAIL.toLowerCase() || e === adminVirtual;
+}
+
 export default function AuthScreen() {
   const router = useRouter();
   const [isRegister, setIsRegister] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  // Google profile completion mode
+  const [showCompleteProfile, setShowCompleteProfile] = useState(false);
 
   // === Register fields ===
   const [name, setName] = useState('');
@@ -67,6 +83,93 @@ export default function AuthScreen() {
   // === Login fields ===
   const [loginPhone, setLoginPhone] = useState('');
   const [loginPass, setLoginPass] = useState('');
+
+  // === Complete profile fields (Google users) ===
+  const [cpName, setCpName] = useState('');
+  const [cpPhone, setCpPhone] = useState('');
+  const [cpEwallet, setCpEwallet] = useState<typeof EWALLET_OPTIONS[0] | null>(null);
+  const [cpEwalletOwner, setCpEwalletOwner] = useState('');
+  const [cpEwalletNumber, setCpEwalletNumber] = useState('');
+  const [cpLoading, setCpLoading] = useState(false);
+  const [showCpEwalletPicker, setShowCpEwalletPicker] = useState(false);
+
+  // Google Auth
+  const [_request, response, promptAsync] = Google.useAuthRequest({
+    webClientId: GOOGLE_WEB_CLIENT_ID,
+    androidClientId: GOOGLE_WEB_CLIENT_ID,
+  });
+
+  // Handle Google response
+  React.useEffect(() => {
+    if (response?.type === 'success') {
+      const { id_token } = response.params;
+      handleGoogleLogin(id_token);
+    } else if (response?.type === 'error') {
+      Alert.alert('Gagal', 'Login Google gagal. Coba lagi.');
+      setGoogleLoading(false);
+    }
+  }, [response]);
+
+  // ===== GOOGLE LOGIN =====
+  const handleGoogleLogin = async (idToken: string) => {
+    setGoogleLoading(true);
+    try {
+      const result = await loginWithGoogle(idToken);
+      const user = auth.currentUser;
+
+      // Admin langsung masuk
+      if (user?.email && isAdminEmail(user.email)) {
+        router.replace('/admin');
+        return;
+      }
+
+      // User biasa — cek profil lengkap
+      if (result.needsProfile) {
+        // Pre-fill nama dari Google
+        setCpName(user?.displayName || '');
+        setShowCompleteProfile(true);
+      } else {
+        router.replace('/(tabs)');
+      }
+    } catch (e: any) {
+      Alert.alert('Gagal', e.message || 'Login Google gagal.');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  // ===== COMPLETE PROFILE (Google users) =====
+  const handleCompleteProfile = async () => {
+    if (!cpName.trim()) return Alert.alert('Lengkapi Data', 'Nama lengkap wajib diisi!');
+    if (!cpPhone.trim() || cpPhone.replace(/[^0-9]/g, '').length < 10) {
+      return Alert.alert('Lengkapi Data', 'Masukkan nomor ponsel yang valid!');
+    }
+    if (!cpEwallet) return Alert.alert('Pilih E-Wallet', 'Pilih metode e-wallet untuk penarikan!');
+    if (!cpEwalletOwner.trim()) return Alert.alert('Lengkapi Data', 'Nama pemilik e-wallet wajib diisi!');
+    if (!cpEwalletNumber.trim()) return Alert.alert('Lengkapi Data', 'Nomor e-wallet wajib diisi!');
+
+    const user = auth.currentUser;
+    if (!user) return Alert.alert('Error', 'Sesi tidak valid. Coba login ulang.');
+
+    setCpLoading(true);
+    try {
+      await completeGoogleProfile(user.uid, {
+        name: cpName.trim(),
+        phone: cpPhone.trim(),
+        ewalletId: cpEwallet.id,
+        ewalletName: cpEwallet.name,
+        ewalletOwner: cpEwalletOwner.trim(),
+        ewalletNumber: cpEwalletNumber.trim(),
+      });
+      Alert.alert('Berhasil! 🎉', 'Profil kamu sudah lengkap.');
+      setShowCompleteProfile(false);
+      router.replace('/(tabs)');
+    } catch (e: any) {
+      Alert.alert('Gagal', e.message || 'Gagal menyimpan profil.');
+    } finally {
+      setCpLoading(false);
+    }
+  };
 
   // ===== REGISTER =====
   const handleRegister = async () => {
@@ -130,21 +233,26 @@ export default function AuthScreen() {
 
   const navigateAfterAuth = () => {
     const user = auth.currentUser;
-    if (user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+    if (user?.email && isAdminEmail(user.email)) {
       router.replace('/admin');
     } else {
       router.replace('/(tabs)');
     }
   };
 
-  // ===== E-WALLET PICKER MODAL =====
-  const renderEwalletPicker = () => (
-    <Modal visible={showEwalletPicker} animationType="slide" transparent>
+  // ===== E-WALLET PICKER MODAL (reusable) =====
+  const renderEwalletPicker = (
+    visible: boolean,
+    onClose: () => void,
+    selected: typeof EWALLET_OPTIONS[0] | null,
+    onSelect: (item: typeof EWALLET_OPTIONS[0]) => void,
+  ) => (
+    <Modal visible={visible} animationType="slide" transparent>
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Pilih E-Wallet / Bank</Text>
-            <TouchableOpacity onPress={() => setShowEwalletPicker(false)}>
+            <TouchableOpacity onPress={onClose}>
               <Text style={styles.modalClose}>✕</Text>
             </TouchableOpacity>
           </View>
@@ -156,21 +264,21 @@ export default function AuthScreen() {
               <TouchableOpacity
                 style={[
                   styles.ewalletItem,
-                  selectedEwallet?.id === item.id && styles.ewalletItemActive,
+                  selected?.id === item.id && styles.ewalletItemActive,
                 ]}
                 onPress={() => {
-                  setSelectedEwallet(item);
-                  setShowEwalletPicker(false);
+                  onSelect(item);
+                  onClose();
                 }}
               >
                 <Text style={styles.ewalletItemIcon}>{item.icon}</Text>
                 <Text style={[
                   styles.ewalletItemName,
-                  selectedEwallet?.id === item.id && { color: colors.cyan },
+                  selected?.id === item.id && { color: colors.cyan },
                 ]}>
                   {item.name}
                 </Text>
-                {selectedEwallet?.id === item.id && (
+                {selected?.id === item.id && (
                   <Text style={styles.ewalletCheck}>✓</Text>
                 )}
               </TouchableOpacity>
@@ -181,6 +289,96 @@ export default function AuthScreen() {
     </Modal>
   );
 
+  // ===== COMPLETE PROFILE SCREEN (for Google users) =====
+  if (showCompleteProfile) {
+    return (
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+          <Text style={styles.icon}>📝</Text>
+          <Text style={styles.title}>Lengkapi Profil</Text>
+          <Text style={styles.subtitle}>
+            Isi data berikut untuk mulai menggunakan CUANTERUS
+          </Text>
+
+          <View style={styles.form}>
+            <Text style={styles.label}>Nama Lengkap</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Masukkan nama lengkap"
+              placeholderTextColor={colors.textMuted}
+              value={cpName}
+              onChangeText={setCpName}
+            />
+
+            <Text style={styles.label}>Nomor Ponsel</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="08xxxxxxxxxx"
+              placeholderTextColor={colors.textMuted}
+              value={cpPhone}
+              onChangeText={setCpPhone}
+              keyboardType="phone-pad"
+            />
+
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>Data E-Wallet</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            <Text style={styles.label}>E-Wallet / Bank</Text>
+            <TouchableOpacity
+              style={styles.pickerBtn}
+              onPress={() => setShowCpEwalletPicker(true)}
+            >
+              {cpEwallet ? (
+                <View style={styles.pickerSelected}>
+                  <Text style={styles.pickerIcon}>{cpEwallet.icon}</Text>
+                  <Text style={styles.pickerName}>{cpEwallet.name}</Text>
+                </View>
+              ) : (
+                <Text style={styles.pickerPlaceholder}>Pilih e-wallet atau bank...</Text>
+              )}
+              <Text style={styles.pickerArrow}>▼</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.label}>Nama Pemilik</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Nama sesuai akun e-wallet / rekening"
+              placeholderTextColor={colors.textMuted}
+              value={cpEwalletOwner}
+              onChangeText={setCpEwalletOwner}
+            />
+
+            <Text style={styles.label}>
+              Nomor {cpEwallet?.name || 'E-Wallet'}
+            </Text>
+            <TextInput
+              style={styles.input}
+              placeholder={cpEwallet?.id?.startsWith('b') || ['cimb', 'mandiri', 'permata', 'octo', 'jenius', 'blu', 'jago', 'seabank', 'neo'].includes(cpEwallet?.id || '')
+                ? 'Nomor rekening'
+                : 'Nomor HP terdaftar'}
+              placeholderTextColor={colors.textMuted}
+              value={cpEwalletNumber}
+              onChangeText={setCpEwalletNumber}
+              keyboardType="phone-pad"
+            />
+
+            <PrimaryButton
+              title="✅  SIMPAN & LANJUTKAN"
+              onPress={handleCompleteProfile}
+              loading={cpLoading}
+              style={{ marginTop: 16 }}
+            />
+          </View>
+        </ScrollView>
+        {renderEwalletPicker(showCpEwalletPicker, () => setShowCpEwalletPicker(false), cpEwallet, setCpEwallet)}
+      </KeyboardAvoidingView>
+    );
+  }
+
+  // ===== MAIN AUTH SCREEN =====
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
@@ -297,6 +495,30 @@ export default function AuthScreen() {
               style={{ marginTop: 12 }}
             />
 
+            {/* Divider OR */}
+            <View style={[styles.divider, { marginVertical: 16 }]}>  
+              <View style={styles.dividerLine} />
+              <Text style={[styles.dividerText, { color: colors.textMuted }]}>ATAU</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            {/* Google Sign In */}
+            <TouchableOpacity
+              style={styles.googleBtn}
+              onPress={() => { setGoogleLoading(true); promptAsync(); }}
+              disabled={googleLoading}
+              activeOpacity={0.7}
+            >
+              {googleLoading ? (
+                <ActivityIndicator color="#333" size="small" />
+              ) : (
+                <>
+                  <Text style={styles.googleIcon}>G</Text>
+                  <Text style={styles.googleText}>Daftar dengan Google</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
             <TouchableOpacity onPress={() => setIsRegister(false)} style={styles.switchBtn}>
               <Text style={styles.switchText}>
                 Sudah punya akun? <Text style={styles.switchHighlight}>Login</Text>
@@ -335,6 +557,30 @@ export default function AuthScreen() {
               style={{ marginTop: 12 }}
             />
 
+            {/* Divider OR */}
+            <View style={[styles.divider, { marginVertical: 16 }]}>
+              <View style={styles.dividerLine} />
+              <Text style={[styles.dividerText, { color: colors.textMuted }]}>ATAU</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            {/* Google Sign In */}
+            <TouchableOpacity
+              style={styles.googleBtn}
+              onPress={() => { setGoogleLoading(true); promptAsync(); }}
+              disabled={googleLoading}
+              activeOpacity={0.7}
+            >
+              {googleLoading ? (
+                <ActivityIndicator color="#333" size="small" />
+              ) : (
+                <>
+                  <Text style={styles.googleIcon}>G</Text>
+                  <Text style={styles.googleText}>Masuk dengan Google</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
             <TouchableOpacity onPress={() => setIsRegister(true)} style={styles.switchBtn}>
               <Text style={styles.switchText}>
                 Belum punya akun? <Text style={styles.switchHighlight}>Daftar</Text>
@@ -344,7 +590,7 @@ export default function AuthScreen() {
         )}
       </ScrollView>
 
-      {renderEwalletPicker()}
+      {renderEwalletPicker(showEwalletPicker, () => setShowEwalletPicker(false), selectedEwallet, setSelectedEwallet)}
     </KeyboardAvoidingView>
   );
 }
@@ -510,6 +756,28 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: colors.cyan,
     fontWeight: '700',
+  },
+
+  // Google Button
+  googleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  googleIcon: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#4285F4',
+  },
+  googleText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#333333',
   },
 
   // Switch

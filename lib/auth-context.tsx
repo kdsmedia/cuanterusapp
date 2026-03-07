@@ -26,6 +26,8 @@ export interface UserData {
   ewalletName: string;
   ewalletOwner: string;
   ewalletNumber: string;
+  loginMethod?: string;
+  profileComplete?: boolean;
 }
 
 export interface Broadcast {

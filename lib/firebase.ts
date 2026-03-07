@@ -24,6 +24,7 @@ export const db = getFirestore(app);
 
 export const ADMIN_EMAIL = "appsidhanie@gmail.com";
 export const ADMIN_PHONE = "085813899649";
+export const GOOGLE_WEB_CLIENT_ID = "327513974065-7eaguiaborrp9vfdlof61244ko8dj60k.apps.googleusercontent.com";
 export const APP_ID = "altomedia-8f793";
 export const MIN_WITHDRAW = 50_000;
 export const CHECKIN_REWARD = 100;
