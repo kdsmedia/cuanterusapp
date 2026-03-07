@@ -12,7 +12,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#0f172a"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -92,7 +94,8 @@
           "iosAppId": "ca-app-pub-6881903056221433~4464124345",
           "userTrackingUsageDescription": "Data ini digunakan untuk menampilkan iklan yang relevan."
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true
