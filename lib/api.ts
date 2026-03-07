@@ -514,6 +514,129 @@ export async function adminDeactivateVoucher(docId: string) {
   await updateDoc(doc(db, VOUCHERS_PATH, docId), { active: false });
 }
 
+// ===== YOUTUBE TASK URLs =====
+
+const YOUTUBE_URLS_PATH = 'artifacts/altomedia-8f793/public/data/youtubeUrls';
+
+export interface YouTubeUrl {
+  id?: string;
+  url: string;
+  title: string;
+  addedAt: any;
+  active: boolean;
+}
+
+/** Admin: tambah URL YouTube */
+export async function adminAddYoutubeUrl(url: string, title: string): Promise<void> {
+  await addDoc(collection(db, YOUTUBE_URLS_PATH), {
+    url,
+    title,
+    addedAt: serverTimestamp(),
+    active: true,
+  });
+}
+
+/** Admin: hapus/nonaktifkan URL YouTube */
+export async function adminRemoveYoutubeUrl(docId: string): Promise<void> {
+  const ref = doc(db, YOUTUBE_URLS_PATH, docId);
+  await updateDoc(ref, { active: false });
+}
+
+/** Admin: ambil semua URL YouTube */
+export async function adminGetYoutubeUrls(): Promise<(YouTubeUrl & { id: string })[]> {
+  const q = query(collection(db, YOUTUBE_URLS_PATH), orderBy('addedAt', 'desc'));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as YouTubeUrl & { id: string }));
+}
+
+/** User: ambil URL YouTube random yang belum ditonton hari ini */
+export async function getRandomYoutubeUrl(uid: string): Promise<(YouTubeUrl & { id: string }) | null> {
+  // Ambil semua URL aktif
+  const q = query(
+    collection(db, YOUTUBE_URLS_PATH),
+    where('active', '==', true)
+  );
+  const snap = await getDocs(q);
+  const allUrls = snap.docs.map(d => ({ id: d.id, ...d.data() } as YouTubeUrl & { id: string }));
+
+  if (allUrls.length === 0) return null;
+
+  // Ambil URL yang sudah ditonton hari ini
+  const today = new Date().toDateString();
+  const userRef = doc(db, USERS_PATH, uid);
+  const userSnap = await getDoc(userRef);
+  const userData = userSnap.data();
+
+  const watchedToday: string[] = userData?.watchedYoutubeToday === today
+    ? (userData?.watchedYoutubeIds || [])
+    : [];
+
+  // Filter yang belum ditonton
+  const unwatched = allUrls.filter(u => !watchedToday.includes(u.id));
+
+  // Kalau semua sudah ditonton, reset & pilih random dari semua
+  const pool = unwatched.length > 0 ? unwatched : allUrls;
+
+  // Random pick
+  const randomIndex = Math.floor(Math.random() * pool.length);
+  return pool[randomIndex];
+}
+
+/** User: tandai YouTube sudah ditonton & klaim reward */
+export const YOUTUBE_WATCH_REWARD = 50;
+export const MAX_DAILY_YOUTUBE = 10;
+
+export async function claimYoutubeReward(uid: string, youtubeDocId: string): Promise<{
+  message: string;
+  watchedToday: number;
+}> {
+  const today = new Date().toDateString();
+  const userRef = doc(db, USERS_PATH, uid);
+  const snap = await getDoc(userRef);
+
+  if (!snap.exists()) throw new Error('User tidak ditemukan');
+
+  const data = snap.data();
+  if (data.blocked) throw new Error('Akun diblokir.');
+
+  // Hitung berapa kali sudah nonton hari ini
+  const isToday = data?.watchedYoutubeToday === today;
+  let watchedIds: string[] = isToday ? (data?.watchedYoutubeIds || []) : [];
+  const watchedCount = watchedIds.length;
+
+  if (watchedCount >= MAX_DAILY_YOUTUBE) {
+    throw new Error(`Batas ${MAX_DAILY_YOUTUBE}x tonton YouTube tercapai hari ini!`);
+  }
+
+  // Tambahkan ke daftar yang sudah ditonton
+  watchedIds.push(youtubeDocId);
+
+  await updateDoc(userRef, {
+    balance: increment(YOUTUBE_WATCH_REWARD),
+    totalEarned: increment(YOUTUBE_WATCH_REWARD),
+    watchedYoutubeToday: today,
+    watchedYoutubeIds: watchedIds,
+  });
+
+  const newCount = watchedIds.length;
+  await logTransaction(uid, 'youtube_watch', YOUTUBE_WATCH_REWARD,
+    `Tonton YouTube (${newCount}/${MAX_DAILY_YOUTUBE})`);
+
+  return {
+    message: `Rp ${YOUTUBE_WATCH_REWARD} masuk! 🎬 (${newCount}/${MAX_DAILY_YOUTUBE})`,
+    watchedToday: newCount,
+  };
+}
+
+/** User: ambil jumlah tonton YouTube hari ini */
+export function getYoutubeWatchCount(userData: any): number {
+  const today = new Date().toDateString();
+  if (userData?.watchedYoutubeToday === today) {
+    return (userData?.watchedYoutubeIds || []).length;
+  }
+  return 0;
+}
+
 // ===== LEADERBOARD =====
 
 export async function getLeaderboard(): Promise<Array<{ name: string; totalEarned: number; level: string; emoji: string }>> {

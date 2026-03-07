@@ -14,6 +14,9 @@ import {
   dailyCheckin, claimAdReward, getAdCountToday,
   getUserLevel, getStreakReward, STREAK_BONUSES,
   WATCH_AD_REWARD, MAX_DAILY_ADS,
+  getRandomYoutubeUrl, claimYoutubeReward, getYoutubeWatchCount,
+  YOUTUBE_WATCH_REWARD, MAX_DAILY_YOUTUBE,
+  YouTubeUrl,
 } from '@/lib/api';
 import { showRewarded, isRewardedReady } from '@/lib/admob';
 import { sendLocalNotification } from '@/lib/permissions';
@@ -26,6 +29,8 @@ export default function HomeScreen() {
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' as any });
   const [watchingAd, setWatchingAd] = useState(false);
   const [checkinLoading, setCheckinLoading] = useState(false);
+  const [ytLoading, setYtLoading] = useState(false);
+  const [currentYtVideo, setCurrentYtVideo] = useState<(YouTubeUrl & { id: string }) | null>(null);
 
   const balance = userData?.balance ?? 0;
   const totalEarned = userData?.totalEarned ?? 0;
@@ -38,6 +43,8 @@ export default function HomeScreen() {
   const alreadyCheckedIn = userData?.lastCheckin === todayStr;
   const adsToday = getAdCountToday(userData);
   const adsMaxed = adsToday >= MAX_DAILY_ADS;
+  const ytWatchedToday = getYoutubeWatchCount(userData);
+  const ytMaxed = ytWatchedToday >= MAX_DAILY_YOUTUBE;
 
   const level = getUserLevel(totalEarned);
   const nextStreakReward = getStreakReward(streak + 1);
@@ -92,6 +99,44 @@ export default function HomeScreen() {
       setToast({ visible: true, message: e.message, type: 'error' });
     } finally {
       setWatchingAd(false);
+    }
+  };
+
+  // ===== YOUTUBE TASK =====
+  const handleWatchYoutube = async () => {
+    if (!firebaseUser || ytMaxed) return;
+
+    setYtLoading(true);
+    try {
+      // Ambil video random
+      const video = await getRandomYoutubeUrl(firebaseUser.uid);
+      if (!video) {
+        setToast({ visible: true, message: 'Belum ada video tersedia. Coba lagi nanti!', type: 'warning' });
+        setYtLoading(false);
+        return;
+      }
+
+      setCurrentYtVideo(video);
+
+      // Buka YouTube
+      await Linking.openURL(video.url);
+
+      // Setelah kembali ke app, klaim reward (delay sedikit)
+      setTimeout(async () => {
+        try {
+          const result = await claimYoutubeReward(firebaseUser.uid, video.id);
+          setToast({ visible: true, message: result.message, type: 'success' });
+          sendLocalNotification('🎬 YouTube Reward!', result.message, 'reward');
+        } catch (e: any) {
+          setToast({ visible: true, message: e.message, type: 'error' });
+        } finally {
+          setYtLoading(false);
+          setCurrentYtVideo(null);
+        }
+      }, 3000);
+    } catch (e: any) {
+      setToast({ visible: true, message: 'Gagal membuka video', type: 'error' });
+      setYtLoading(false);
     }
   };
 
@@ -242,6 +287,34 @@ export default function HomeScreen() {
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
                 <Text style={styles.claimText}>{adsMaxed ? 'MAKS' : 'TONTON'}</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </GlassCard>
+
+        {/* YouTube Task */}
+        <GlassCard style={styles.taskCard}>
+          <View style={styles.taskRow}>
+            <View style={[styles.taskIcon, { backgroundColor: 'rgba(239,68,68,0.2)' }]}>
+              <Text style={{ fontSize: 22 }}>🎬</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.taskTitle}>Tonton YouTube</Text>
+              <Text style={styles.taskDesc}>Rp {YOUTUBE_WATCH_REWARD} per video</Text>
+              <Text style={[styles.taskDesc, { color: ytMaxed ? colors.red : '#ef4444', marginTop: 2 }]}>
+                {ytWatchedToday}/{MAX_DAILY_YOUTUBE} hari ini
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.claimBtn, { backgroundColor: ytMaxed ? '#334155' : '#ef4444' }]}
+              onPress={handleWatchYoutube}
+              disabled={ytLoading || ytMaxed}
+              activeOpacity={0.7}
+            >
+              {ytLoading ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={styles.claimText}>{ytMaxed ? 'MAKS' : 'TONTON'}</Text>
               )}
             </TouchableOpacity>
           </View>

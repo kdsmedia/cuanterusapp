@@ -25,14 +25,18 @@ import {
   adminCreateVoucher,
   adminGetVouchers,
   adminDeactivateVoucher,
+  adminAddYoutubeUrl,
+  adminRemoveYoutubeUrl,
+  adminGetYoutubeUrls,
   Voucher,
+  YouTubeUrl,
 } from '@/lib/api';
 import { UserData } from '@/lib/auth-context';
 import GlassCard from '@/components/GlassCard';
 import PrimaryButton from '@/components/PrimaryButton';
 import { colors } from '@/lib/theme';
 
-type Tab = 'users' | 'vouchers' | 'deposits' | 'withdrawals' | 'broadcast';
+type Tab = 'users' | 'vouchers' | 'youtube' | 'deposits' | 'withdrawals' | 'broadcast';
 
 interface Deposit {
   id: string;
@@ -72,6 +76,12 @@ export default function AdminScreen() {
   const [vcLoading, setVcLoading] = useState(false);
   const [vcCreated, setVcCreated] = useState<string | null>(null);
 
+  // YouTube state
+  const [youtubeUrls, setYoutubeUrls] = useState<(YouTubeUrl & { id: string })[]>([]);
+  const [ytUrl, setYtUrl] = useState('');
+  const [ytTitle, setYtTitle] = useState('');
+  const [ytLoading, setYtLoading] = useState(false);
+
   // Broadcast state
   const [bcTitle, setBcTitle] = useState('');
   const [bcMessage, setBcMessage] = useState('');
@@ -97,10 +107,13 @@ export default function AdminScreen() {
     return unsub;
   }, []);
 
-  // Load vouchers when tab changes
+  // Load vouchers/youtube when tab changes
   useEffect(() => {
     if (tab === 'vouchers') {
       adminGetVouchers().then(setVouchers).catch(console.error);
+    }
+    if (tab === 'youtube') {
+      adminGetYoutubeUrls().then(setYoutubeUrls).catch(console.error);
     }
   }, [tab]);
 
@@ -224,6 +237,41 @@ export default function AdminScreen() {
     ]);
   };
 
+  // ===== YouTube Handlers =====
+  const handleAddYoutube = async () => {
+    if (!ytUrl.trim()) return Alert.alert('Error', 'Masukkan URL YouTube!');
+    if (!ytUrl.includes('youtu')) return Alert.alert('Error', 'URL harus YouTube yang valid!');
+
+    setYtLoading(true);
+    try {
+      const title = ytTitle.trim() || `Video ${youtubeUrls.length + 1}`;
+      await adminAddYoutubeUrl(ytUrl.trim(), title);
+      setYtUrl('');
+      setYtTitle('');
+      const updated = await adminGetYoutubeUrls();
+      setYoutubeUrls(updated);
+      Alert.alert('✅ Berhasil', `Video "${title}" ditambahkan!`);
+    } catch (e: any) {
+      Alert.alert('Gagal', e.message);
+    } finally {
+      setYtLoading(false);
+    }
+  };
+
+  const handleRemoveYoutube = (yt: YouTubeUrl & { id: string }) => {
+    Alert.alert('Hapus Video', `Hapus "${yt.title}" dari daftar tugas?`, [
+      { text: 'Batal', style: 'cancel' },
+      {
+        text: 'Hapus', style: 'destructive',
+        onPress: async () => {
+          await adminRemoveYoutubeUrl(yt.id);
+          const updated = await adminGetYoutubeUrls();
+          setYoutubeUrls(updated);
+        },
+      },
+    ]);
+  };
+
   const handleBroadcast = async () => {
     if (!bcTitle.trim() || !bcMessage.trim()) return Alert.alert('Error', 'Isi judul dan pesan!');
     setBcLoading(true);
@@ -265,12 +313,12 @@ export default function AdminScreen() {
       {/* Tabs */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
           <View style={styles.tabs}>
-            {(['users', 'vouchers', 'deposits', 'withdrawals', 'broadcast'] as Tab[]).map(t => (
+            {(['users', 'vouchers', 'youtube', 'deposits', 'withdrawals', 'broadcast'] as Tab[]).map(t => (
               <TouchableOpacity key={t} style={[styles.tab, tab === t && styles.tabActive]} onPress={() => setTab(t)}>
                 <Text style={[styles.tabText, tab === t && { color: colors.cyan }]}>
-                  {t === 'users' ? '👥' : t === 'vouchers' ? '🎁' : t === 'deposits' ? '💳' : t === 'withdrawals' ? '💸' : '📢'}
+                  {t === 'users' ? '👥' : t === 'vouchers' ? '🎁' : t === 'youtube' ? '🎬' : t === 'deposits' ? '💳' : t === 'withdrawals' ? '💸' : '📢'}
                   {' '}
-                  {t === 'users' ? 'Users' : t === 'vouchers' ? 'Voucher' : t === 'deposits' ? 'Deposit' : t === 'withdrawals' ? 'WD' : 'BC'}
+                  {t === 'users' ? 'Users' : t === 'vouchers' ? 'Voucher' : t === 'youtube' ? 'YT' : t === 'deposits' ? 'Deposit' : t === 'withdrawals' ? 'WD' : 'BC'}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -481,6 +529,98 @@ export default function AdminScreen() {
           contentContainerStyle={{ paddingBottom: 24 }}
           ListEmptyComponent={<Text style={styles.empty}>Belum ada penarikan.</Text>}
         />
+      )}
+
+      {tab === 'youtube' && (
+        <ScrollView showsVerticalScrollIndicator={false}>
+          {/* Add YouTube URL */}
+          <GlassCard style={{ marginBottom: 16 }}>
+            <Text style={styles.bcLabel}>🎬 Tambah Video YouTube</Text>
+            <Text style={{ fontSize: 11, color: colors.textMuted, marginBottom: 12 }}>
+              Video akan ditampilkan secara random sebagai tugas untuk pengguna.
+              Semakin banyak video, semakin bervariasi tugas yang muncul!
+            </Text>
+
+            <Text style={[styles.bcLabel, { fontSize: 12, marginTop: 4 }]}>URL YouTube *</Text>
+            <TextInput
+              style={styles.bcInput}
+              value={ytUrl}
+              onChangeText={setYtUrl}
+              placeholder="https://youtube.com/watch?v=..."
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="none"
+              keyboardType="url"
+            />
+
+            <Text style={[styles.bcLabel, { fontSize: 12, marginTop: 12 }]}>Judul Video (opsional)</Text>
+            <TextInput
+              style={styles.bcInput}
+              value={ytTitle}
+              onChangeText={setYtTitle}
+              placeholder="Deskripsi singkat video"
+              placeholderTextColor={colors.textMuted}
+            />
+
+            <PrimaryButton
+              title="➕  TAMBAH VIDEO"
+              onPress={handleAddYoutube}
+              loading={ytLoading}
+              style={{ marginTop: 16 }}
+            />
+          </GlassCard>
+
+          {/* YouTube URL List */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <Text style={styles.bcLabel}>📋 Daftar Video ({youtubeUrls.filter(y => y.active).length} aktif)</Text>
+          </View>
+
+          {youtubeUrls.length === 0 ? (
+            <Text style={styles.empty}>Belum ada video YouTube.</Text>
+          ) : (
+            youtubeUrls.map((yt, idx) => (
+              <GlassCard key={yt.id} style={{ marginBottom: 8, opacity: yt.active ? 1 : 0.4 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: yt.active ? 'rgba(239,68,68,0.15)' : 'rgba(100,116,139,0.15)', justifyContent: 'center', alignItems: 'center', marginRight: 10 }}>
+                    <Text style={{ fontSize: 16 }}>▶️</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: yt.active ? colors.textPrimary : colors.textMuted }} numberOfLines={1}>
+                      {yt.title}
+                    </Text>
+                    <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }} numberOfLines={1}>
+                      {yt.url}
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end', marginLeft: 8 }}>
+                    <Text style={{ fontSize: 10, color: yt.active ? colors.green : colors.red, fontWeight: '700' }}>
+                      {yt.active ? '🟢 Aktif' : '🔴 Nonaktif'}
+                    </Text>
+                    {yt.active && (
+                      <TouchableOpacity
+                        style={[styles.actionBtn, { borderColor: colors.red, marginTop: 6, paddingHorizontal: 8, paddingVertical: 4 }]}
+                        onPress={() => handleRemoveYoutube(yt)}
+                      >
+                        <Text style={[styles.actionText, { color: colors.red, fontSize: 9 }]}>🗑️ Hapus</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              </GlassCard>
+            ))
+          )}
+
+          {/* Info */}
+          <GlassCard style={{ marginTop: 8, marginBottom: 24 }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textPrimary, marginBottom: 6 }}>ℹ️ Cara Kerja</Text>
+            <Text style={{ fontSize: 11, color: colors.textSecondary, lineHeight: 18 }}>
+              • Video ditampilkan random ke pengguna sebagai tugas harian{'\n'}
+              • Setiap tonton = Rp 50 reward{'\n'}
+              • Maks 10x tonton/hari{'\n'}
+              • Video yang sudah ditonton tidak muncul lagi di hari yang sama{'\n'}
+              • Jika semua video sudah ditonton, video akan di-recycle
+            </Text>
+          </GlassCard>
+        </ScrollView>
       )}
 
       {tab === 'broadcast' && (
