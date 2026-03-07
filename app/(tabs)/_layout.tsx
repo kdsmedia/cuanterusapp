@@ -19,7 +19,7 @@ export default function TabLayout() {
         tabBarActiveTintColor: colors.cyan,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarLabelStyle: {
-          fontSize: 9,
+          fontSize: 10,
           fontWeight: '700',
         },
       }}
@@ -28,58 +28,42 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>🏠</Text>,
-        }}
-      />
-      <Tabs.Screen
-        name="games"
-        options={{
-          title: 'Games',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>🎮</Text>,
-        }}
-      />
-      <Tabs.Screen
-        name="spin"
-        options={{
-          title: 'Spin',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>🎰</Text>,
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 22, color }}>🏠</Text>,
         }}
       />
       <Tabs.Screen
         name="bonus"
         options={{
           title: 'Bonus',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>🎁</Text>,
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 22, color }}>🎁</Text>,
         }}
       />
       <Tabs.Screen
-        name="deposit"
+        name="games"
         options={{
-          title: 'Deposit',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>💳</Text>,
+          title: 'Game',
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 22, color }}>🎮</Text>,
         }}
       />
       <Tabs.Screen
-        name="leaderboard"
+        name="wallet"
         options={{
-          title: 'Ranking',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>🏆</Text>,
-        }}
-      />
-      <Tabs.Screen
-        name="withdraw"
-        options={{
-          title: 'Tarik',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>💰</Text>,
+          title: 'Dompet',
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 22, color }}>💰</Text>,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profil',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>👤</Text>,
+          title: 'Akun',
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 22, color }}>👤</Text>,
         }}
       />
+      {/* Hidden screens - accessible from parent tabs */}
+      <Tabs.Screen name="spin" options={{ href: null }} />
+      <Tabs.Screen name="leaderboard" options={{ href: null }} />
+      <Tabs.Screen name="deposit" options={{ href: null }} />
+      <Tabs.Screen name="withdraw" options={{ href: null }} />
     </Tabs>
   );
 }
