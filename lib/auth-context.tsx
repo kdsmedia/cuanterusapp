@@ -22,6 +22,10 @@ export interface UserData {
   spinsToday: number;
   lastSpinDate: string;
   blocked: boolean;
+  ewalletId: string;
+  ewalletName: string;
+  ewalletOwner: string;
+  ewalletNumber: string;
 }
 
 export interface Broadcast {

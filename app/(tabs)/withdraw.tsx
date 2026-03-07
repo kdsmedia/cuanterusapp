@@ -21,21 +21,24 @@ export default function WithdrawScreen() {
   const pct = Math.min((balance / MIN_WITHDRAW) * 100, 100);
   const canWithdraw = balance >= MIN_WITHDRAW;
 
-  const [method, setMethod] = useState<'DANA' | 'OVO' | 'GoPay'>('DANA');
-  const [accountNumber, setAccountNumber] = useState('');
+  // Ambil data ewallet dari profil user (diisi saat register)
+  const ewalletName = userData?.ewalletName || 'E-Wallet';
+  const ewalletOwner = userData?.ewalletOwner || '-';
+  const ewalletNumber = userData?.ewalletNumber || '';
+
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' as any });
 
   const handleWithdraw = async () => {
     if (!firebaseUser || !canWithdraw) return;
 
-    if (!accountNumber.trim()) {
-      return Alert.alert('Lengkapi Data', 'Masukkan nomor akun / HP tujuan!');
+    if (!ewalletNumber) {
+      return Alert.alert('Data E-Wallet Kosong', 'Update profil kamu dulu dengan data e-wallet yang valid.');
     }
 
     Alert.alert(
       'Konfirmasi Penarikan',
-      `Tarik Rp ${balance.toLocaleString('id-ID')} ke ${method} (${accountNumber})?`,
+      `Tarik Rp ${balance.toLocaleString('id-ID')} ke:\n\n${ewalletName}\n${ewalletOwner}\n${ewalletNumber}`,
       [
         { text: 'Batal', style: 'cancel' },
         {
@@ -43,9 +46,13 @@ export default function WithdrawScreen() {
           onPress: async () => {
             setLoading(true);
             try {
-              await requestWithdrawal(firebaseUser.uid, balance, method, accountNumber.trim());
+              await requestWithdrawal(
+                firebaseUser.uid,
+                balance,
+                ewalletName,
+                ewalletNumber
+              );
               setToast({ visible: true, message: 'Penarikan diajukan! Tunggu persetujuan admin.', type: 'success' });
-              setAccountNumber('');
             } catch (e: any) {
               setToast({ visible: true, message: e.message, type: 'error' });
             } finally {
@@ -87,47 +94,32 @@ export default function WithdrawScreen() {
         </Text>
       </GlassCard>
 
+      {/* E-Wallet Info dari profil */}
+      <GlassCard style={{ marginBottom: 20 }}>
+        <Text style={styles.ewalletTitle}>📱 Tujuan Penarikan</Text>
+        <View style={styles.ewalletRow}>
+          <Text style={styles.ewalletLabel}>Metode</Text>
+          <Text style={styles.ewalletValue}>{ewalletName}</Text>
+        </View>
+        <View style={styles.ewalletRow}>
+          <Text style={styles.ewalletLabel}>Nama Pemilik</Text>
+          <Text style={styles.ewalletValue}>{ewalletOwner}</Text>
+        </View>
+        <View style={styles.ewalletRow}>
+          <Text style={styles.ewalletLabel}>Nomor</Text>
+          <Text style={styles.ewalletValue}>{ewalletNumber || '-'}</Text>
+        </View>
+        <Text style={styles.ewalletNote}>
+          * Data e-wallet diambil dari profil kamu saat mendaftar
+        </Text>
+      </GlassCard>
+
       {canWithdraw ? (
-        <>
-          {/* Method Selection */}
-          <Text style={styles.formLabel}>Metode Penarikan</Text>
-          <View style={styles.methodRow}>
-            {(['DANA', 'OVO', 'GoPay'] as const).map((m) => (
-              <GlassCard
-                key={m}
-                style={[
-                  styles.methodCard,
-                  method === m && styles.methodActive,
-                ]}
-              >
-                <Text
-                  style={[styles.methodText, method === m && { color: colors.cyan }]}
-                  onPress={() => setMethod(m)}
-                >
-                  {m}
-                </Text>
-              </GlassCard>
-            ))}
-          </View>
-
-          {/* Account Number */}
-          <Text style={styles.formLabel}>Nomor {method}</Text>
-          <TextInput
-            style={styles.input}
-            placeholder={`Masukkan nomor ${method}`}
-            placeholderTextColor={colors.textMuted}
-            value={accountNumber}
-            onChangeText={setAccountNumber}
-            keyboardType="phone-pad"
-          />
-
-          <PrimaryButton
-            title="📤  TARIK SALDO"
-            onPress={handleWithdraw}
-            loading={loading}
-            style={{ marginTop: 16 }}
-          />
-        </>
+        <PrimaryButton
+          title="📤  TARIK SALDO"
+          onPress={handleWithdraw}
+          loading={loading}
+        />
       ) : (
         <PrimaryButton
           title="🔒  BELUM MENCAPAI MINIMAL WD"
@@ -141,7 +133,7 @@ export default function WithdrawScreen() {
       <GlassCard style={{ marginTop: 20 }}>
         <Text style={styles.infoTitle}>ℹ️ Informasi Penarikan</Text>
         <Text style={styles.infoText}>• Minimal penarikan: Rp 50.000</Text>
-        <Text style={styles.infoText}>• Metode: DANA, OVO, GoPay</Text>
+        <Text style={styles.infoText}>• Metode sesuai e-wallet yang didaftarkan</Text>
         <Text style={styles.infoText}>• Proses: 1-3 hari kerja</Text>
         <Text style={styles.infoText}>• Penarikan harus disetujui admin</Text>
       </GlassCard>
@@ -170,16 +162,38 @@ const styles = StyleSheet.create({
   progressTrack: { height: 12, backgroundColor: '#334155', borderRadius: 6, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: colors.cyan, borderRadius: 6 },
   progressText: { fontSize: 12, color: colors.textMuted, textAlign: 'right', marginTop: 8 },
-  formLabel: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, marginBottom: 8, marginTop: 8 },
-  methodRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
-  methodCard: { flex: 1, alignItems: 'center', paddingVertical: 12 },
-  methodActive: { borderColor: colors.cyan },
-  methodText: { fontSize: 14, fontWeight: '700', color: colors.textSecondary },
-  input: {
-    backgroundColor: colors.darkSurface,
-    borderWidth: 1, borderColor: '#334155',
-    borderRadius: 16, padding: 16, fontSize: 15, color: colors.textPrimary,
+
+  // E-Wallet card
+  ewalletTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.textPrimary,
+    marginBottom: 12,
   },
+  ewalletRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  ewalletLabel: {
+    fontSize: 13,
+    color: colors.textMuted,
+  },
+  ewalletValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  ewalletNote: {
+    fontSize: 11,
+    color: colors.textMuted,
+    marginTop: 10,
+    fontStyle: 'italic',
+  },
+
   infoTitle: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, marginBottom: 8 },
   infoText: { fontSize: 12, color: colors.textSecondary, marginTop: 4 },
 });

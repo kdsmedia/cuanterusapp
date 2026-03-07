@@ -89,12 +89,20 @@ async function logTransaction(uid: string, type: string, amount: number, descrip
 
 // ===== AUTH =====
 
+export interface EwalletData {
+  ewalletId: string;
+  ewalletName: string;
+  ewalletOwner: string;
+  ewalletNumber: string;
+}
+
 export async function registerUser(
   name: string,
   email: string,
   password: string,
   phone: string,
-  referralCode: string
+  referralCode: string,
+  ewallet?: EwalletData
 ) {
   const cred = await createUserWithEmailAndPassword(auth, email, password);
   const uid = cred.user.uid;
@@ -125,6 +133,11 @@ export async function registerUser(
     spinsToday: 0,
     lastSpinDate: '',
     blocked: false,
+    // E-Wallet data
+    ewalletId: ewallet?.ewalletId || '',
+    ewalletName: ewallet?.ewalletName || '',
+    ewalletOwner: ewallet?.ewalletOwner || '',
+    ewalletNumber: ewallet?.ewalletNumber || '',
   });
 
   if (referralCode) {
