@@ -167,34 +167,7 @@ export default function BonusScreen() {
           />
         </GlassCard>
 
-        {/* Tips */}
-        <GlassCard>
-          <Text style={styles.sectionTitle}>💡 Cara Dapat Bonus</Text>
-          <View style={styles.tipItem}>
-            <Text style={styles.tipIcon}>📅</Text>
-            <Text style={styles.tipText}>Check-in harian (streak bonus sampai Rp 500)</Text>
-          </View>
-          <View style={styles.tipItem}>
-            <Text style={styles.tipIcon}>▶️</Text>
-            <Text style={styles.tipText}>Nonton video iklan (Rp 50/video, 20x/hari)</Text>
-          </View>
-          <View style={styles.tipItem}>
-            <Text style={styles.tipIcon}>🎬</Text>
-            <Text style={styles.tipText}>Tonton YouTube (Rp 50/video, 10x/hari)</Text>
-          </View>
-          <View style={styles.tipItem}>
-            <Text style={styles.tipIcon}>🎰</Text>
-            <Text style={styles.tipText}>Lucky Spin (Rp 10 - Rp 500, 5x/hari)</Text>
-          </View>
-          <View style={styles.tipItem}>
-            <Text style={styles.tipIcon}>👥</Text>
-            <Text style={styles.tipText}>Ajak teman (Rp 500 per referral)</Text>
-          </View>
-          <View style={styles.tipItem}>
-            <Text style={styles.tipIcon}>🎫</Text>
-            <Text style={styles.tipText}>Klaim voucher dari event & giveaway</Text>
-          </View>
-        </GlassCard>
+        {/* Tips - hidden for cleaner UI */}
 
         <View style={{ height: 24 }} />
       </ScrollView>
