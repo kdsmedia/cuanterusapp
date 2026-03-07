@@ -12,15 +12,14 @@ import {
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/lib/auth-context';
 import { GAME_LIST, GameInfo } from '@/lib/game-bridge';
-import GlassCard from '@/components/GlassCard';
 import Toast from '@/components/Toast';
 import { colors } from '@/lib/theme';
 
 const { width } = Dimensions.get('window');
-const CARD_WIDTH = (width - 48) / 2; // 2 columns with padding
+const CARD_GAP = 8;
+const PADDING = 12;
+const CARD_WIDTH = (width - PADDING * 2 - CARD_GAP * 2) / 3;
 
-// Map game icons to require() - karena React Native butuh static require untuk bundled assets
-// Untuk production, ganti dengan URL server atau CDN
 const gameIcons: Record<string, any> = {
   'AztecGemsDeluxe.jpg': require('@/assets/ico/AztecGemsDeluxe.jpg'),
   'BonanzaGold.jpg': require('@/assets/ico/BonanzaGold.jpg'),
@@ -51,7 +50,6 @@ export default function GamesScreen() {
 
   const balance = userData?.balance ?? 0;
 
-  // Filter games berdasarkan search
   const filteredGames = GAME_LIST.filter(game =>
     game.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
     game.provider.toLowerCase().includes(searchQuery.toLowerCase())
@@ -66,85 +64,80 @@ export default function GamesScreen() {
       setToast({ visible: true, message: 'Saldo tidak cukup! Deposit atau klaim bonus dulu.', type: 'warning' });
       return;
     }
-    // Navigate ke game screen dengan parameter
     router.push({ pathname: '/game', params: { gameId: game.id, gameName: game.displayName } });
-  };
-
-  const renderGameCard = (game: GameInfo) => {
-    const icon = gameIcons[game.icon];
-
-    return (
-      <TouchableOpacity
-        key={game.id}
-        style={styles.gameCard}
-        activeOpacity={0.8}
-        onPress={() => handlePlayGame(game)}
-      >
-        <View style={styles.gameImageContainer}>
-          {icon ? (
-            <Image source={icon} style={styles.gameImage} resizeMode="cover" />
-          ) : (
-            <View style={styles.gamePlaceholder}>
-              <Text style={styles.gamePlaceholderText}>🎰</Text>
-            </View>
-          )}
-          {/* Provider badge */}
-          <View style={styles.providerBadge}>
-            <Text style={styles.providerBadgeText}>{game.provider}</Text>
-          </View>
-        </View>
-        <View style={styles.gameInfo}>
-          <Text style={styles.gameName} numberOfLines={1}>{game.displayName}</Text>
-          <Text style={styles.gameCategory}>{game.category}</Text>
-        </View>
-      </TouchableOpacity>
-    );
   };
 
   return (
     <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
+
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>🎮 Games</Text>
+          <View>
+            <Text style={styles.headerTitle}>🎮 Games</Text>
+            <Text style={styles.headerSub}>{GAME_LIST.length} game tersedia</Text>
+          </View>
           <View style={styles.balanceChip}>
-            <Text style={styles.balanceChipText}>
-              Rp {balance.toLocaleString('id-ID')}
-            </Text>
+            <Text style={styles.balanceLabel}>Saldo</Text>
+            <Text style={styles.balanceValue}>Rp {balance.toLocaleString('id-ID')}</Text>
           </View>
         </View>
 
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
+        {/* Search */}
+        <View style={styles.searchWrap}>
+          <Text style={styles.searchIcon}>🔍</Text>
           <TextInput
             style={styles.searchInput}
-            placeholder="Cari game..."
+            placeholder="Cari game atau provider..."
             placeholderTextColor={colors.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearBtn}>
+              <Text style={styles.clearBtnText}>✕</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
-        {/* Game Count */}
-        <Text style={styles.gameCount}>
-          {filteredGames.length} game tersedia
-        </Text>
+        {/* Game Grid — 3 kolom */}
+        <View style={styles.grid}>
+          {filteredGames.map((game) => {
+            const icon = gameIcons[game.icon];
+            return (
+              <TouchableOpacity
+                key={game.id}
+                style={styles.card}
+                activeOpacity={0.75}
+                onPress={() => handlePlayGame(game)}
+              >
+                {/* Icon */}
+                <View style={styles.iconWrap}>
+                  {icon ? (
+                    <Image source={icon} style={styles.iconImage} resizeMode="cover" />
+                  ) : (
+                    <View style={styles.iconPlaceholder}>
+                      <Text style={{ fontSize: 28 }}>🎰</Text>
+                    </View>
+                  )}
+                </View>
 
-        {/* Game Grid */}
-        <View style={styles.gameGrid}>
-          {filteredGames.map(game => renderGameCard(game))}
+                {/* Name */}
+                <Text style={styles.gameName} numberOfLines={2}>
+                  {game.displayName}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
-        {/* Info Footer */}
-        <GlassCard style={styles.infoCard}>
-          <Text style={styles.infoTitle}>ℹ️ Info Bermain</Text>
-          <Text style={styles.infoText}>
-            • Saldo game otomatis terhubung dengan saldo aplikasi{'\n'}
-            • Kemenangan langsung masuk ke saldo utama{'\n'}
-            • Pastikan koneksi internet stabil saat bermain{'\n'}
-            • Bermain dengan bijak dan bertanggung jawab
-          </Text>
-        </GlassCard>
+        {/* Empty state */}
+        {filteredGames.length === 0 && (
+          <View style={styles.empty}>
+            <Text style={styles.emptyIcon}>🔎</Text>
+            <Text style={styles.emptyText}>Game tidak ditemukan</Text>
+          </View>
+        )}
 
         <View style={{ height: 30 }} />
       </ScrollView>
@@ -165,128 +158,128 @@ const styles = StyleSheet.create({
     backgroundColor: colors.darkBg,
     paddingTop: 50,
   },
+
+  // Header
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    marginBottom: 16,
+    paddingHorizontal: PADDING,
+    marginBottom: 14,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '800',
     color: colors.textPrimary,
   },
+  headerSub: {
+    fontSize: 11,
+    color: colors.textMuted,
+    marginTop: 2,
+  },
   balanceChip: {
-    backgroundColor: 'rgba(6, 182, 212, 0.15)',
+    alignItems: 'flex-end',
+    backgroundColor: 'rgba(6,182,212,0.12)',
     borderWidth: 1,
-    borderColor: colors.cyan,
-    borderRadius: 20,
-    paddingHorizontal: 14,
+    borderColor: 'rgba(6,182,212,0.35)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  balanceChipText: {
+  balanceLabel: {
+    color: colors.textMuted,
+    fontSize: 9,
+    fontWeight: '600',
+  },
+  balanceValue: {
     color: colors.cyan,
-    fontWeight: '700',
-    fontSize: 13,
+    fontWeight: '800',
+    fontSize: 14,
   },
-  searchContainer: {
-    paddingHorizontal: 16,
-    marginBottom: 12,
-  },
-  searchInput: {
+
+  // Search
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: colors.darkSurface,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    color: colors.textPrimary,
+    marginHorizontal: PADDING,
+    marginBottom: 16,
+    paddingHorizontal: 12,
+  },
+  searchIcon: {
     fontSize: 14,
+    marginRight: 8,
   },
-  gameCount: {
-    paddingHorizontal: 16,
+  searchInput: {
+    flex: 1,
+    color: colors.textPrimary,
+    fontSize: 13,
+    paddingVertical: 10,
+  },
+  clearBtn: {
+    padding: 4,
+  },
+  clearBtnText: {
     color: colors.textMuted,
-    fontSize: 12,
-    marginBottom: 12,
+    fontSize: 14,
+    fontWeight: '700',
   },
-  gameGrid: {
+
+  // Grid 3 columns
+  grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: 12,
-    justifyContent: 'space-between',
+    paddingHorizontal: PADDING,
+    gap: CARD_GAP,
   },
-  gameCard: {
+  card: {
     width: CARD_WIDTH,
     backgroundColor: colors.darkSurface,
-    borderRadius: 12,
-    marginBottom: 12,
-    marginHorizontal: 4,
+    borderRadius: 14,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: colors.border,
   },
-  gameImageContainer: {
+  iconWrap: {
     width: '100%',
-    height: CARD_WIDTH * 0.6,
+    aspectRatio: 1,
     backgroundColor: colors.darkCard,
-    position: 'relative',
+    overflow: 'hidden',
   },
-  gameImage: {
+  iconImage: {
     width: '100%',
     height: '100%',
   },
-  gamePlaceholder: {
+  iconPlaceholder: {
     width: '100%',
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.darkCard,
-  },
-  gamePlaceholderText: {
-    fontSize: 36,
-  },
-  providerBadge: {
-    position: 'absolute',
-    bottom: 4,
-    right: 4,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  providerBadgeText: {
-    color: colors.cyan,
-    fontSize: 8,
-    fontWeight: '600',
-  },
-  gameInfo: {
-    padding: 10,
   },
   gameName: {
     color: colors.textPrimary,
     fontWeight: '700',
-    fontSize: 13,
-    marginBottom: 2,
+    fontSize: 11,
+    textAlign: 'center',
+    paddingHorizontal: 4,
+    paddingVertical: 8,
+    lineHeight: 14,
   },
-  gameCategory: {
+
+  // Empty
+  empty: {
+    alignItems: 'center',
+    marginTop: 60,
+  },
+  emptyIcon: {
+    fontSize: 40,
+    marginBottom: 10,
+  },
+  emptyText: {
     color: colors.textMuted,
-    fontSize: 10,
-  },
-  infoCard: {
-    marginHorizontal: 16,
-    marginTop: 8,
-    padding: 14,
-  },
-  infoTitle: {
-    color: colors.textPrimary,
-    fontWeight: '700',
     fontSize: 14,
-    marginBottom: 8,
-  },
-  infoText: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    lineHeight: 20,
   },
 });
