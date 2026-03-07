@@ -10,7 +10,8 @@
         "credentialsSource": "remote"
       },
       "distribution": "internal",
-      "autoIncrement": false
+      "autoIncrement": false,
+      "withoutCredentials": false
     },
     "production": {
       "android": {
@@ -19,8 +20,5 @@
       },
       "distribution": "store"
     }
-  },
-  "submit": {
-    "production": {}
   }
 }
