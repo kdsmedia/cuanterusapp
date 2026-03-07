@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useAuth } from '@/lib/auth-context';
 import { claimSpinReward, getSpinCountToday, SPIN_PRIZES, MAX_DAILY_SPINS } from '@/lib/api';
-import { showRewarded, isRewardedReady } from '@/lib/admob';
+import { showRewarded, isRewardedReady, reloadRewarded } from '@/lib/admob';
 import Toast from '@/components/Toast';
 import { colors } from '@/lib/theme';
 
@@ -30,21 +30,15 @@ export default function SpinScreen() {
   const handleSpin = async () => {
     if (!firebaseUser || spinning || maxedOut) return;
 
-    if (!isRewardedReady()) {
-      setToast({ visible: true, message: 'Iklan belum siap, tunggu sebentar...', type: 'warning' });
-      return;
-    }
-
-    // Watch ad first
+    // Tampilkan iklan jika siap, tapi spin tetap jalan
     setSpinning(true);
     setResult(null);
 
     try {
-      const watched = await showRewarded();
-      if (!watched) {
-        setToast({ visible: true, message: 'Tonton iklan untuk spin!', type: 'warning' });
-        setSpinning(false);
-        return;
+      if (isRewardedReady()) {
+        await showRewarded();
+      } else {
+        reloadRewarded();
       }
 
       // Pick random prize (weighted: lower prizes more common)

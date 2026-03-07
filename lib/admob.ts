@@ -12,7 +12,7 @@ const AD_IDS = {
   REWARDED: 'ca-app-pub-6881903056221433/2935420254',
 };
 
-// Set to true during development to use test ads
+// Gunakan test ads saat development
 const USE_TEST_ADS = __DEV__;
 
 const getInterstitialId = () =>
@@ -26,7 +26,12 @@ const getRewardedId = () =>
 let interstitialAd: InterstitialAd | null = null;
 let interstitialLoaded = false;
 
-export function loadInterstitial() {
+function createInterstitial() {
+  // Cleanup old listeners
+  if (interstitialAd) {
+    try { interstitialAd.removeAllListeners(); } catch (_) {}
+  }
+
   interstitialAd = InterstitialAd.createForAdRequest(getInterstitialId(), {
     requestNonPersonalizedAdsOnly: true,
   });
@@ -39,14 +44,14 @@ export function loadInterstitial() {
   interstitialAd.addAdEventListener(AdEventType.CLOSED, () => {
     interstitialLoaded = false;
     // Auto-reload after closed
-    loadInterstitial();
+    setTimeout(() => createInterstitial(), 1000);
   });
 
   interstitialAd.addAdEventListener(AdEventType.ERROR, (error) => {
     interstitialLoaded = false;
     console.log('[AdMob] Interstitial error:', error);
     // Retry after 30s
-    setTimeout(loadInterstitial, 30000);
+    setTimeout(() => createInterstitial(), 30000);
   });
 
   interstitialAd.load();
@@ -69,7 +74,12 @@ export function showInterstitial(): Promise<boolean> {
 let rewardedAd: RewardedAd | null = null;
 let rewardedLoaded = false;
 
-export function loadRewarded() {
+function createRewarded() {
+  // Cleanup old listeners
+  if (rewardedAd) {
+    try { rewardedAd.removeAllListeners(); } catch (_) {}
+  }
+
   rewardedAd = RewardedAd.createForAdRequest(getRewardedId(), {
     requestNonPersonalizedAdsOnly: true,
   });
@@ -79,19 +89,10 @@ export function loadRewarded() {
     console.log('[AdMob] Rewarded loaded');
   });
 
-  rewardedAd.addAdEventListener(RewardedAdEventType.EARNED_REWARD, (reward) => {
-    console.log('[AdMob] User earned reward:', reward);
-  });
-
-  rewardedAd.addAdEventListener(AdEventType.CLOSED, () => {
-    rewardedLoaded = false;
-    loadRewarded();
-  });
-
   rewardedAd.addAdEventListener(AdEventType.ERROR, (error) => {
     rewardedLoaded = false;
     console.log('[AdMob] Rewarded error:', error);
-    setTimeout(loadRewarded, 30000);
+    setTimeout(() => createRewarded(), 30000);
   });
 
   rewardedAd.load();
@@ -105,26 +106,47 @@ export function showRewarded(): Promise<boolean> {
       return;
     }
 
+    let rewarded = false;
+    let resolved = false;
+
+    const cleanup = () => {
+      try { unsubReward(); } catch (_) {}
+      try { unsubClose(); } catch (_) {}
+    };
+
     // Listen for reward earned
     const unsubReward = rewardedAd.addAdEventListener(
       RewardedAdEventType.EARNED_REWARD,
       () => {
-        unsubReward();
-        resolve(true);
+        rewarded = true;
+        console.log('[AdMob] User earned reward');
       }
     );
 
-    // Listen for close without reward
+    // Listen for ad closed — resolve here so we know final state
     const unsubClose = rewardedAd.addAdEventListener(
       AdEventType.CLOSED,
       () => {
-        unsubClose();
-        // resolve(false) only if reward wasn't given
-        // The EARNED_REWARD fires before CLOSED, so this is a fallback
+        cleanup();
+        rewardedLoaded = false;
+        if (!resolved) {
+          resolved = true;
+          resolve(rewarded);
+        }
+        // Reload next ad
+        setTimeout(() => createRewarded(), 1000);
       }
     );
 
-    rewardedAd.show();
+    rewardedAd.show().catch(() => {
+      cleanup();
+      rewardedLoaded = false;
+      if (!resolved) {
+        resolved = true;
+        resolve(false);
+      }
+      setTimeout(() => createRewarded(), 5000);
+    });
   });
 }
 
@@ -132,9 +154,10 @@ export function showRewarded(): Promise<boolean> {
 
 export function initAdMob() {
   console.log('[AdMob] Initializing...');
+  console.log('[AdMob] App ID: ca-app-pub-6881903056221433~4464124345');
   console.log('[AdMob] Using test ads:', USE_TEST_ADS);
-  loadInterstitial();
-  loadRewarded();
+  createInterstitial();
+  createRewarded();
 }
 
 export function isRewardedReady() {
@@ -143,4 +166,11 @@ export function isRewardedReady() {
 
 export function isInterstitialReady() {
   return interstitialLoaded;
+}
+
+/** Force reload rewarded ad (e.g. after failed attempt) */
+export function reloadRewarded() {
+  if (!rewardedLoaded) {
+    createRewarded();
+  }
 }

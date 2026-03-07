@@ -18,7 +18,7 @@ import {
   YOUTUBE_WATCH_REWARD, MAX_DAILY_YOUTUBE,
   YouTubeUrl,
 } from '@/lib/api';
-import { showRewarded, isRewardedReady } from '@/lib/admob';
+import { showRewarded, isRewardedReady, reloadRewarded } from '@/lib/admob';
 import { sendLocalNotification } from '@/lib/permissions';
 import GlassCard from '@/components/GlassCard';
 import Toast from '@/components/Toast';
@@ -54,19 +54,15 @@ export default function HomeScreen() {
   const handleCheckin = async () => {
     if (!firebaseUser || alreadyCheckedIn) return;
 
-    if (!isRewardedReady()) {
-      setToast({ visible: true, message: 'Iklan belum siap, tunggu sebentar...', type: 'warning' });
-      return;
-    }
-
     setCheckinLoading(true);
     try {
-      const watched = await showRewarded();
-      if (!watched) {
-        setToast({ visible: true, message: 'Tonton iklan untuk klaim reward!', type: 'warning' });
-        setCheckinLoading(false);
-        return;
+      // Coba tampilkan iklan, tapi tetap kasih reward walau iklan gagal
+      if (isRewardedReady()) {
+        await showRewarded();
+      } else {
+        reloadRewarded(); // Reload untuk next time
       }
+
       const res = await dailyCheckin(firebaseUser.uid);
       setToast({ visible: true, message: res.message, type: 'success' });
       sendLocalNotification('🎁 Check-in Berhasil!', res.message, 'reward');
@@ -80,21 +76,22 @@ export default function HomeScreen() {
   const handleWatchAd = async () => {
     if (!firebaseUser || adsMaxed) return;
 
-    if (!isRewardedReady()) {
-      setToast({ visible: true, message: 'Iklan belum siap...', type: 'warning' });
-      return;
-    }
-
     setWatchingAd(true);
     try {
-      const rewarded = await showRewarded();
-      if (rewarded) {
-        const result = await claimAdReward(firebaseUser.uid);
-        setToast({ visible: true, message: result.message, type: 'success' });
-        sendLocalNotification('🎬 Video Reward!', result.message, 'reward');
+      if (isRewardedReady()) {
+        const rewarded = await showRewarded();
+        if (!rewarded) {
+          setToast({ visible: true, message: 'Tonton iklan sampai selesai!', type: 'warning' });
+          setWatchingAd(false);
+          return;
+        }
       } else {
-        setToast({ visible: true, message: 'Tonton sampai selesai!', type: 'warning' });
+        reloadRewarded();
       }
+
+      const result = await claimAdReward(firebaseUser.uid);
+      setToast({ visible: true, message: result.message, type: 'success' });
+      sendLocalNotification('🎬 Video Reward!', result.message, 'reward');
     } catch (e: any) {
       setToast({ visible: true, message: e.message, type: 'error' });
     } finally {
