@@ -29,17 +29,45 @@ export const MAX_DAILY_ADS = 20;
 // Streak bonus: day 1=100, day 2=150, day 3=200, day 4=250, day 5=300, day 6=400, day 7+=500
 export const STREAK_BONUSES = [100, 150, 200, 250, 300, 400, 500];
 
-// Spin wheel prizes
+// Spin wheel prizes — 20 segmen (tampil Rp10 - Rp100.000, tapi hasil max Rp250)
 export const SPIN_PRIZES = [
-  { label: 'Rp 10', value: 10, color: '#06b6d4' },
-  { label: 'Rp 25', value: 25, color: '#8b5cf6' },
-  { label: 'Rp 50', value: 50, color: '#10b981' },
-  { label: 'Rp 100', value: 100, color: '#f59e0b' },
-  { label: 'Rp 200', value: 200, color: '#ef4444' },
-  { label: 'Rp 500', value: 500, color: '#ec4899' },
-  { label: 'Rp 25', value: 25, color: '#6366f1' },
-  { label: 'Rp 50', value: 50, color: '#14b8a6' },
+  { label: 'Rp 10',     value: 10,     color: '#64748b' },
+  { label: 'Rp 5.000',  value: 5000,   color: '#06b6d4' },
+  { label: 'Rp 25',     value: 25,     color: '#8b5cf6' },
+  { label: 'Rp 50.000', value: 50000,  color: '#f59e0b' },
+  { label: 'Rp 50',     value: 50,     color: '#10b981' },
+  { label: 'Rp 1.000',  value: 1000,   color: '#0ea5e9' },
+  { label: 'Rp 100',    value: 100,    color: '#ef4444' },
+  { label: 'Rp 10.000', value: 10000,  color: '#f97316' },
+  { label: 'Rp 15',     value: 15,     color: '#a855f7' },
+  { label: 'Rp 100K',   value: 100000, color: '#eab308' },
+  { label: 'Rp 200',    value: 200,    color: '#ec4899' },
+  { label: 'Rp 2.500',  value: 2500,   color: '#14b8a6' },
+  { label: 'Rp 20',     value: 20,     color: '#6366f1' },
+  { label: 'Rp 25.000', value: 25000,  color: '#f43f5e' },
+  { label: 'Rp 75',     value: 75,     color: '#22c55e' },
+  { label: 'Rp 500',    value: 500,    color: '#d946ef' },
+  { label: 'Rp 250',    value: 250,    color: '#fb923c' },
+  { label: 'Rp 75.000', value: 75000,  color: '#facc15' },
+  { label: 'Rp 150',    value: 150,    color: '#2dd4bf' },
+  { label: 'Rp 30',     value: 30,     color: '#818cf8' },
 ];
+
+// Weighted index → hasil REAL yang bisa didapat (max Rp250)
+// Hanya prize dengan value ≤ 250 yang bisa menang
+export const SPIN_REAL_WEIGHTS: { index: number; weight: number }[] = [
+  { index: 0,  weight: 20 },  // Rp 10
+  { index: 8,  weight: 14 },  // Rp 15
+  { index: 12, weight: 12 },  // Rp 20
+  { index: 2,  weight: 14 },  // Rp 25
+  { index: 19, weight: 10 },  // Rp 30
+  { index: 4,  weight: 10 },  // Rp 50
+  { index: 14, weight: 7 },   // Rp 75
+  { index: 6,  weight: 5 },   // Rp 100
+  { index: 18, weight: 3 },   // Rp 150
+  { index: 10, weight: 3 },   // Rp 200
+  { index: 16, weight: 2 },   // Rp 250
+]; // total = 100
 
 // Level thresholds
 export const LEVELS = [
