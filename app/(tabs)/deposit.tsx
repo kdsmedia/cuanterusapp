@@ -6,15 +6,13 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
-  ActivityIndicator,
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import { useAuth } from '@/lib/auth-context';
-import { createDeposit, confirmDepositPayment } from '@/lib/api';
+import { createDeposit } from '@/lib/api';
 import { generateQRIS, generateTrxId, DEPOSIT_NOMINALS } from '@/lib/qris';
-import { sendLocalNotification } from '@/lib/permissions';
 import GlassCard from '@/components/GlassCard';
 import PrimaryButton from '@/components/PrimaryButton';
 import Toast from '@/components/Toast';
@@ -25,11 +23,8 @@ export default function DepositScreen() {
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [qrisData, setQrisData] = useState<string | null>(null);
   const [trxId, setTrxId] = useState('');
-  const [depositDocId, setDepositDocId] = useState('');
   const [timer, setTimer] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [confirming, setConfirming] = useState(false);
-  const [confirmed, setConfirmed] = useState(false);
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' as any });
   const qrRef = useRef<any>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -44,15 +39,13 @@ export default function DepositScreen() {
     if (!selectedAmount || !firebaseUser) return;
 
     setLoading(true);
-    setConfirmed(false);
     try {
       const txId = generateTrxId();
       const qris = generateQRIS(selectedAmount);
-      const docId = await createDeposit(firebaseUser.uid, selectedAmount, txId);
+      await createDeposit(firebaseUser.uid, selectedAmount, txId);
 
       setQrisData(qris);
       setTrxId(txId);
-      setDepositDocId(docId);
 
       // Start 5 minute timer
       setTimer(300);
@@ -77,46 +70,6 @@ export default function DepositScreen() {
     }
   };
 
-  // ===== AUTO CONFIRM PAYMENT =====
-  const handleConfirmPayment = async () => {
-    if (!firebaseUser || !depositDocId || !selectedAmount || confirmed) return;
-
-    Alert.alert(
-      '✅ Konfirmasi Pembayaran',
-      `Apakah kamu sudah berhasil membayar Rp ${selectedAmount.toLocaleString('id-ID')} via QRIS?\n\nSaldo akan langsung masuk ke akunmu.`,
-      [
-        { text: 'Belum', style: 'cancel' },
-        {
-          text: 'Sudah Bayar',
-          onPress: async () => {
-            setConfirming(true);
-            try {
-              await confirmDepositPayment(depositDocId, firebaseUser.uid, selectedAmount);
-              setConfirmed(true);
-              if (timerRef.current) clearInterval(timerRef.current);
-
-              setToast({
-                visible: true,
-                message: `✅ Rp ${selectedAmount.toLocaleString('id-ID')} berhasil masuk ke saldo!`,
-                type: 'success',
-              });
-
-              sendLocalNotification(
-                '💳 Deposit Berhasil!',
-                `Rp ${selectedAmount.toLocaleString('id-ID')} telah ditambahkan ke saldo kamu.`,
-                'deposit'
-              );
-            } catch (e: any) {
-              setToast({ visible: true, message: e.message, type: 'error' });
-            } finally {
-              setConfirming(false);
-            }
-          },
-        },
-      ]
-    );
-  };
-
   const handleSaveQR = async () => {
     if (!qrRef.current) return;
     try {
@@ -134,8 +87,7 @@ export default function DepositScreen() {
 
   const handleReset = () => {
     setQrisData(null);
-    setConfirmed(false);
-    setDepositDocId('');
+    setSelectedAmount(null);
     if (timerRef.current) clearInterval(timerRef.current);
     setTimer(0);
   };
@@ -198,7 +150,7 @@ export default function DepositScreen() {
         )}
 
         {/* QR Code Display */}
-        {qrisData && !confirmed && (
+        {qrisData && (
           <View style={styles.qrSection}>
             <Text style={[styles.timer, timer <= 60 && { color: colors.red }]}>
               ⏱️ Selesaikan dalam {formatTimer(timer)}
@@ -211,9 +163,7 @@ export default function DepositScreen() {
               <View style={styles.qrWrapper}>
                 <QRCode value={qrisData} size={200} backgroundColor="#FFFFFF" color="#000000" />
               </View>
-              <Text style={styles.qrAmount}>
-                Rp {selectedAmount?.toLocaleString('id-ID')}
-              </Text>
+              <Text style={styles.qrAmount}>Rp {selectedAmount?.toLocaleString('id-ID')}</Text>
               <View style={styles.qrDivider} />
               <Text style={styles.qrTrxId}>{trxId}</Text>
             </View>
@@ -226,25 +176,7 @@ export default function DepositScreen() {
               style={{ marginTop: 16 }}
             />
 
-            {/* CONFIRM PAYMENT BUTTON */}
-            <TouchableOpacity
-              style={styles.confirmBtn}
-              onPress={handleConfirmPayment}
-              disabled={confirming}
-              activeOpacity={0.8}
-            >
-              {confirming ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <>
-                  <Text style={styles.confirmBtnIcon}>✅</Text>
-                  <Text style={styles.confirmBtnText}>SUDAH BAYAR</Text>
-                  <Text style={styles.confirmBtnDesc}>Tekan setelah pembayaran berhasil</Text>
-                </>
-              )}
-            </TouchableOpacity>
-
-            {/* New QR Button */}
+            {/* New QR */}
             <TouchableOpacity style={styles.newQrBtn} onPress={handleReset}>
               <Text style={styles.newQrText}>🔄 Buat QR Baru</Text>
             </TouchableOpacity>
@@ -257,52 +189,10 @@ export default function DepositScreen() {
               <Text style={styles.instrStep}>3. Pilih menu Scan / QRIS</Text>
               <Text style={styles.instrStep}>4. Klik ikon Galeri, pilih gambar QR tadi</Text>
               <Text style={styles.instrStep}>5. Bayar sesuai nominal</Text>
-              <Text style={[styles.instrStep, { color: colors.green, fontWeight: '700', marginTop: 8 }]}>
-                6. Kembali ke sini → Tekan "SUDAH BAYAR"
-              </Text>
-              <Text style={[styles.instrStep, { color: colors.cyan, marginTop: 4 }]}>
-                💡 Saldo otomatis masuk setelah konfirmasi!
+              <Text style={[styles.instrStep, { color: colors.yellow, marginTop: 8, fontWeight: '700' }]}>
+                ⚠️ Saldo masuk setelah admin konfirmasi (maks 1x24 jam)
               </Text>
             </GlassCard>
-          </View>
-        )}
-
-        {/* Success State */}
-        {confirmed && (
-          <View style={styles.successSection}>
-            <Text style={styles.successIcon}>🎉</Text>
-            <Text style={styles.successTitle}>Deposit Berhasil!</Text>
-            <Text style={styles.successAmount}>
-              +Rp {selectedAmount?.toLocaleString('id-ID')}
-            </Text>
-            <Text style={styles.successDesc}>
-              Saldo telah ditambahkan ke akunmu
-            </Text>
-
-            <GlassCard style={{ marginTop: 20, width: '100%' }}>
-              <View style={styles.receiptRow}>
-                <Text style={styles.receiptLabel}>Nominal</Text>
-                <Text style={styles.receiptValue}>Rp {selectedAmount?.toLocaleString('id-ID')}</Text>
-              </View>
-              <View style={styles.receiptRow}>
-                <Text style={styles.receiptLabel}>Metode</Text>
-                <Text style={styles.receiptValue}>QRIS</Text>
-              </View>
-              <View style={styles.receiptRow}>
-                <Text style={styles.receiptLabel}>ID Transaksi</Text>
-                <Text style={[styles.receiptValue, { fontFamily: 'monospace', fontSize: 11 }]}>{trxId}</Text>
-              </View>
-              <View style={[styles.receiptRow, { borderBottomWidth: 0 }]}>
-                <Text style={styles.receiptLabel}>Status</Text>
-                <Text style={[styles.receiptValue, { color: colors.green }]}>✅ Berhasil</Text>
-              </View>
-            </GlassCard>
-
-            <PrimaryButton
-              title="💳  DEPOSIT LAGI"
-              onPress={handleReset}
-              style={{ marginTop: 20 }}
-            />
           </View>
         )}
 
@@ -348,52 +238,10 @@ const styles = StyleSheet.create({
   qrDivider: { width: '100%', height: 1, backgroundColor: '#e2e8f0', marginVertical: 12 },
   qrTrxId: { fontSize: 10, fontWeight: '800', color: '#94a3b8' },
 
-  // Confirm Payment Button
-  confirmBtn: {
-    marginTop: 16,
-    width: '100%',
-    backgroundColor: '#10b981',
-    borderRadius: 20,
-    paddingVertical: 20,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    shadowColor: '#10b981',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  confirmBtnIcon: { fontSize: 28 },
-  confirmBtnText: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#fff',
-    marginTop: 4,
-    letterSpacing: 1,
-  },
-  confirmBtnDesc: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.7)',
-    marginTop: 4,
-  },
-
   newQrBtn: { marginTop: 12, padding: 10 },
   newQrText: { fontSize: 14, color: colors.cyan, fontWeight: '700' },
 
   instructions: { marginTop: 16, width: '100%' },
   instrTitle: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, marginBottom: 8 },
   instrStep: { fontSize: 12, color: colors.textSecondary, marginTop: 4, lineHeight: 20 },
-
-  // Success
-  successSection: { marginTop: 20, alignItems: 'center' },
-  successIcon: { fontSize: 64 },
-  successTitle: { fontSize: 24, fontWeight: '900', color: colors.green, marginTop: 8 },
-  successAmount: { fontSize: 36, fontWeight: '900', color: colors.yellow, marginTop: 8 },
-  successDesc: { fontSize: 14, color: colors.textSecondary, marginTop: 4 },
-  receiptRow: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
-  },
-  receiptLabel: { fontSize: 13, color: colors.textMuted },
-  receiptValue: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
 });
