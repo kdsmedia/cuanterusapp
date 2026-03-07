@@ -441,13 +441,13 @@ export async function adminBroadcast(title: string, message: string) {
 
 const DEPOSITS_PATH = 'artifacts/altomedia-8f793/public/data/deposits';
 
-export async function createDeposit(uid: string, amount: number, trxId: string) {
+export async function createDeposit(uid: string, amount: number, trxId: string): Promise<string> {
   const userRef = doc(db, USERS_PATH, uid);
   const snap = await getDoc(userRef);
   if (!snap.exists()) throw new Error('User tidak ditemukan');
   const data = snap.data();
 
-  await addDoc(collection(db, DEPOSITS_PATH), {
+  const docRef = await addDoc(collection(db, DEPOSITS_PATH), {
     uid,
     name: data.name || '',
     email: data.email || '',
@@ -460,6 +460,34 @@ export async function createDeposit(uid: string, amount: number, trxId: string) 
   });
 
   await logTransaction(uid, 'deposit_pending', amount, `Deposit QRIS Rp ${amount.toLocaleString('id-ID')} (${trxId})`);
+  return docRef.id;
+}
+
+/** User: konfirmasi pembayaran deposit — saldo langsung masuk */
+export async function confirmDepositPayment(depositDocId: string, uid: string, amount: number): Promise<void> {
+  const ref = doc(db, DEPOSITS_PATH, depositDocId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) throw new Error('Deposit tidak ditemukan');
+
+  const data = snap.data();
+  if (data.status === 'confirmed') throw new Error('Deposit sudah dikonfirmasi sebelumnya.');
+  if (data.status === 'expired') throw new Error('Deposit sudah expired.');
+  if (data.uid !== uid) throw new Error('Deposit bukan milik kamu.');
+
+  // Konfirmasi & tambah saldo
+  await updateDoc(ref, {
+    status: 'confirmed',
+    confirmedAt: serverTimestamp(),
+    confirmMethod: 'auto',
+  });
+
+  await updateDoc(doc(db, USERS_PATH, uid), {
+    balance: increment(amount),
+    totalEarned: increment(amount),
+  });
+
+  await logTransaction(uid, 'deposit_confirmed', amount,
+    `Deposit QRIS Rp ${amount.toLocaleString('id-ID')} berhasil`);
 }
 
 export async function adminConfirmDeposit(docId: string, uid: string, amount: number) {
