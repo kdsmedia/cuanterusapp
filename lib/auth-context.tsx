@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { doc, onSnapshot, collection, query, orderBy, limit } from 'firebase/firestore';
-import { auth, db, USERS_PATH, ADMIN_EMAIL } from './firebase';
+import { auth, db, USERS_PATH, ADMIN_EMAIL, ADMIN_PHONE } from './firebase';
 
 export interface UserData {
   uid: string;
@@ -76,7 +76,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!firebaseUser) return;
 
     const email = firebaseUser.email?.toLowerCase() || '';
-    const admin = email === ADMIN_EMAIL.toLowerCase();
+    // Admin bisa login via email langsung ATAU via phone (virtual email)
+    const adminVirtualEmail = `${ADMIN_PHONE}@cuanterus.app`.toLowerCase();
+    const admin = email === ADMIN_EMAIL.toLowerCase() || email === adminVirtualEmail;
     setIsAdmin(admin);
 
     if (admin) {

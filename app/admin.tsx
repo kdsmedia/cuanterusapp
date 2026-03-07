@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
-import { db, USERS_PATH, ADMIN_EMAIL } from '@/lib/firebase';
+import { db, USERS_PATH, ADMIN_EMAIL, ADMIN_PHONE } from '@/lib/firebase';
 import {
   logoutUser,
   adminUpdateBalance,
@@ -98,7 +98,8 @@ export default function AdminScreen() {
       const list: UserData[] = [];
       snap.forEach((doc) => {
         const data = doc.data() as UserData;
-        if (data.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+        const adminVirtualEmail = `${ADMIN_PHONE}@cuanterus.app`.toLowerCase();
+        if (data.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase() && data.email?.toLowerCase() !== adminVirtualEmail) {
           list.push(data);
         }
       });
