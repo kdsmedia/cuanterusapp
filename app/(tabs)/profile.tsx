@@ -64,8 +64,10 @@ export default function ProfileScreen() {
       </View>
       <Text style={styles.name}>{userData?.name || '...'}</Text>
       <Text style={styles.levelText}>{level.current.emoji} {level.current.name} (Level {level.current.level})</Text>
-      <Text style={styles.email}>{userData?.email || '...'}</Text>
-      {userData?.phone ? <Text style={styles.phone}>WA: {userData.phone}</Text> : null}
+      <Text style={styles.email}>📱 {userData?.phone || '...'}</Text>
+      {userData?.ewalletName ? (
+        <Text style={styles.phone}>💳 {userData.ewalletName} — {userData.ewalletNumber}</Text>
+      ) : null}
 
       {/* Stats Grid */}
       <View style={styles.statsGrid}>

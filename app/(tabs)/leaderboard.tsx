@@ -58,7 +58,7 @@ export default function LeaderboardScreen() {
     const isTop3 = rank <= 3;
 
     return (
-      <GlassCard style={[styles.card, isTop3 && styles.cardTop3]}>
+      <GlassCard style={[styles.card, isTop3 ? styles.cardTop3 : undefined] as any}>
         <View style={styles.row}>
           <Text style={[styles.rank, isTop3 && styles.rankTop3]}>
             {medalEmoji(rank)}
