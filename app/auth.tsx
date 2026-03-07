@@ -17,8 +17,10 @@ import {
 import { useRouter } from 'expo-router';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { registerUser, loginUser, loginWithGoogle, completeGoogleProfile } from '@/lib/api';
-import { ADMIN_EMAIL, ADMIN_PHONE, GOOGLE_WEB_CLIENT_ID, auth } from '@/lib/firebase';
+import { ADMIN_EMAIL, ADMIN_PHONE, GOOGLE_WEB_CLIENT_ID, auth, db, USERS_PATH } from '@/lib/firebase';
 import PrimaryButton from '@/components/PrimaryButton';
 import { colors } from '@/lib/theme';
 
@@ -217,8 +219,34 @@ export default function AuthScreen() {
 
     setLoading(true);
     try {
+      const cleanPhone = loginPhone.trim().replace(/[^0-9]/g, '');
       const email = phoneToEmail(loginPhone);
-      await loginUser(email, loginPass);
+
+      try {
+        await loginUser(email, loginPass);
+      } catch (loginErr: any) {
+        // Jika akun admin belum ada, otomatis daftarkan
+        const isAdminAttempt = cleanPhone === ADMIN_PHONE.replace(/[^0-9]/g, '');
+        if (isAdminAttempt && (loginErr.code === 'auth/user-not-found' || loginErr.code === 'auth/invalid-credential')) {
+          const cred = await createUserWithEmailAndPassword(auth, email, loginPass);
+          await setDoc(doc(db, USERS_PATH, cred.user.uid), {
+            email,
+            name: 'Admin CUANTERUS',
+            phone: cleanPhone,
+            balance: 0,
+            totalEarned: 0,
+            referralCode: 'ADMIN',
+            referredBy: '',
+            loginMethod: 'phone',
+            profileComplete: true,
+            blocked: false,
+            createdAt: serverTimestamp(),
+          });
+        } else {
+          throw loginErr;
+        }
+      }
+
       navigateAfterAuth();
     } catch (e: any) {
       let msg = 'Nomor atau Password salah.';
