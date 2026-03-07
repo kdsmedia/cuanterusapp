@@ -1,7 +1,7 @@
 node_modules/
 .expo/
 dist/
-*.jks
+# *.jks (needed for EAS local credentials)
 *.p8
 *.p12
 *.key
