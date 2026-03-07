@@ -10,7 +10,11 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/lib/auth-context';
-import { claimVoucher, getUserLevel, SPIN_PRIZES, MAX_DAILY_SPINS, getSpinCountToday } from '@/lib/api';
+import {
+  claimVoucher, getUserLevel, MAX_DAILY_SPINS, getSpinCountToday,
+  getPiggyBankData, saveToPiggyBank, breakPiggyBank,
+  PIGGY_BANK_TARGET, PIGGY_BANK_BONUS,
+} from '@/lib/api';
 import { sendLocalNotification } from '@/lib/permissions';
 import GlassCard from '@/components/GlassCard';
 import PrimaryButton from '@/components/PrimaryButton';
@@ -23,10 +27,52 @@ export default function BonusScreen() {
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' as any });
+  const [piggyAmount, setPiggyAmount] = useState('');
+  const [piggyLoading, setPiggyLoading] = useState(false);
 
   const level = getUserLevel(userData?.totalEarned || 0);
+  const piggy = getPiggyBankData(userData);
   const spinsToday = getSpinCountToday(userData);
   const spinsLeft = MAX_DAILY_SPINS - spinsToday;
+
+  // ===== PIGGY BANK =====
+  const handlePiggySave = async () => {
+    if (!firebaseUser) return;
+    const amount = parseInt(piggyAmount);
+    if (!amount || isNaN(amount)) return Alert.alert('Error', 'Masukkan jumlah yang valid!');
+
+    setPiggyLoading(true);
+    try {
+      const msg = await saveToPiggyBank(firebaseUser.uid, amount);
+      setToast({ visible: true, message: msg, type: 'success' });
+      setPiggyAmount('');
+    } catch (e: any) {
+      setToast({ visible: true, message: e.message, type: 'error' });
+    } finally {
+      setPiggyLoading(false);
+    }
+  };
+
+  const handlePiggyBreak = async () => {
+    if (!firebaseUser) return;
+    Alert.alert('🐷 Pecahkan Celengan?', `Kamu akan dapat:\n\nTabungan: Rp ${piggy.saved.toLocaleString('id-ID')}\nBonus: Rp ${PIGGY_BANK_BONUS.toLocaleString('id-ID')}\n\nTotal: Rp ${(piggy.saved + PIGGY_BANK_BONUS).toLocaleString('id-ID')}`, [
+      { text: 'Batal', style: 'cancel' },
+      {
+        text: '💥 PECAHKAN!',
+        onPress: async () => {
+          setPiggyLoading(true);
+          try {
+            const msg = await breakPiggyBank(firebaseUser.uid);
+            setToast({ visible: true, message: msg, type: 'success' });
+          } catch (e: any) {
+            setToast({ visible: true, message: e.message, type: 'error' });
+          } finally {
+            setPiggyLoading(false);
+          }
+        },
+      },
+    ]);
+  };
 
   const handleClaim = async () => {
     if (!firebaseUser) return;
@@ -93,7 +139,73 @@ export default function BonusScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Level & Spin hidden — accessible via menu cards above */}
+        {/* Piggy Bank */}
+        <GlassCard style={{ marginBottom: 16, borderColor: 'rgba(251,191,36,0.2)' }}>
+          <View style={styles.piggyHeader}>
+            <Text style={{ fontSize: 40 }}>🐷</Text>
+            <View style={{ flex: 1, marginLeft: 14 }}>
+              <Text style={styles.piggyTitle}>Celengan</Text>
+              <Text style={styles.piggySaved}>
+                Rp {piggy.saved.toLocaleString('id-ID')}
+              </Text>
+            </View>
+            {piggy.canBreak && (
+              <TouchableOpacity
+                style={styles.piggyBreakBtn}
+                onPress={handlePiggyBreak}
+                disabled={piggyLoading}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.piggyBreakText}>💥 PECAH!</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Progress bar */}
+          <View style={styles.piggyProgress}>
+            <View style={[styles.piggyFill, { width: `${piggy.progress}%` }]} />
+          </View>
+          <View style={styles.piggyProgressLabels}>
+            <Text style={styles.piggyProgressText}>
+              {Math.round(piggy.progress)}%
+            </Text>
+            <Text style={styles.piggyProgressText}>
+              Target: Rp {PIGGY_BANK_TARGET.toLocaleString('id-ID')}
+            </Text>
+          </View>
+
+          {/* Save input */}
+          {!piggy.canBreak && (
+            <View style={styles.piggySaveRow}>
+              <TextInput
+                style={styles.piggySaveInput}
+                value={piggyAmount}
+                onChangeText={setPiggyAmount}
+                placeholder="Jumlah"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="number-pad"
+                maxLength={4}
+              />
+              <TouchableOpacity
+                style={styles.piggySaveBtn}
+                onPress={handlePiggySave}
+                disabled={piggyLoading || !piggyAmount}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.piggySaveBtnText}>
+                  {piggyLoading ? '...' : '💰 TABUNG'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <Text style={styles.piggyInfo}>
+            {piggy.canBreak
+              ? `🎉 Celengan penuh! Pecahkan untuk dapat bonus Rp ${PIGGY_BANK_BONUS.toLocaleString('id-ID')}!`
+              : `Tabung saldo ke celengan. Penuh = bonus Rp ${PIGGY_BANK_BONUS.toLocaleString('id-ID')}!`
+            }
+          </Text>
+        </GlassCard>
 
         {/* Voucher Section */}
         <GlassCard style={{ marginBottom: 16 }}>
@@ -248,6 +360,94 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.textMuted,
     marginTop: 4,
+  },
+
+  // Piggy Bank
+  piggyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  piggyTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: colors.textPrimary,
+  },
+  piggySaved: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: colors.yellow,
+    marginTop: 2,
+  },
+  piggyBreakBtn: {
+    backgroundColor: 'rgba(251,191,36,0.2)',
+    borderWidth: 1,
+    borderColor: colors.yellow,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  piggyBreakText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.yellow,
+  },
+  piggyProgress: {
+    height: 12,
+    backgroundColor: '#334155',
+    borderRadius: 6,
+    overflow: 'hidden',
+    marginTop: 14,
+  },
+  piggyFill: {
+    height: '100%',
+    backgroundColor: colors.yellow,
+    borderRadius: 6,
+  },
+  piggyProgressLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 6,
+  },
+  piggyProgressText: {
+    fontSize: 10,
+    color: colors.textMuted,
+    fontWeight: '600',
+  },
+  piggySaveRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 14,
+  },
+  piggySaveInput: {
+    flex: 1,
+    backgroundColor: colors.darkBg,
+    borderWidth: 1,
+    borderColor: '#334155',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    textAlign: 'center',
+  },
+  piggySaveBtn: {
+    backgroundColor: colors.yellow,
+    borderRadius: 12,
+    paddingHorizontal: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  piggySaveBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  piggyInfo: {
+    fontSize: 11,
+    color: colors.textMuted,
+    marginTop: 10,
+    textAlign: 'center',
+    lineHeight: 16,
   },
 
   // Voucher

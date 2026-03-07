@@ -732,6 +732,68 @@ export function getYoutubeWatchCount(userData: any): number {
   return 0;
 }
 
+// ===== PIGGY BANK =====
+
+export const PIGGY_BANK_TARGET = 10000; // Target tabungan Rp 10.000
+export const PIGGY_BANK_BONUS = 1000;   // Bonus pecah celengan Rp 1.000
+
+export function getPiggyBankData(userData: any): { saved: number; progress: number; canBreak: boolean } {
+  const saved = userData?.piggyBank || 0;
+  const progress = Math.min((saved / PIGGY_BANK_TARGET) * 100, 100);
+  return { saved, progress, canBreak: saved >= PIGGY_BANK_TARGET };
+}
+
+/** Simpan ke celengan (ambil dari saldo) */
+export async function saveToPiggyBank(uid: string, amount: number): Promise<string> {
+  if (amount < 100) throw new Error('Minimal tabung Rp 100');
+  if (amount > 5000) throw new Error('Maksimal tabung Rp 5.000 per kali');
+
+  const userRef = doc(db, USERS_PATH, uid);
+  const snap = await getDoc(userRef);
+  if (!snap.exists()) throw new Error('User tidak ditemukan');
+
+  const data = snap.data();
+  if (data.balance < amount) throw new Error('Saldo tidak cukup!');
+
+  const currentPiggy = data.piggyBank || 0;
+  if (currentPiggy + amount > PIGGY_BANK_TARGET) {
+    throw new Error(`Celengan sudah hampir penuh! Sisa: Rp ${(PIGGY_BANK_TARGET - currentPiggy).toLocaleString('id-ID')}`);
+  }
+
+  await updateDoc(userRef, {
+    balance: increment(-amount),
+    piggyBank: increment(amount),
+  });
+
+  await logTransaction(uid, 'piggy_save', -amount, `Tabung ke celengan Rp ${amount.toLocaleString('id-ID')}`);
+  return `🐷 Rp ${amount.toLocaleString('id-ID')} ditabung! Total: Rp ${(currentPiggy + amount).toLocaleString('id-ID')}`;
+}
+
+/** Pecah celengan — dapat bonus! */
+export async function breakPiggyBank(uid: string): Promise<string> {
+  const userRef = doc(db, USERS_PATH, uid);
+  const snap = await getDoc(userRef);
+  if (!snap.exists()) throw new Error('User tidak ditemukan');
+
+  const data = snap.data();
+  const saved = data.piggyBank || 0;
+  if (saved < PIGGY_BANK_TARGET) {
+    throw new Error(`Celengan belum penuh! Kurang Rp ${(PIGGY_BANK_TARGET - saved).toLocaleString('id-ID')}`);
+  }
+
+  const totalReturn = saved + PIGGY_BANK_BONUS;
+  await updateDoc(userRef, {
+    balance: increment(totalReturn),
+    totalEarned: increment(PIGGY_BANK_BONUS),
+    piggyBank: 0, // Reset
+  });
+
+  await logTransaction(uid, 'piggy_break', totalReturn,
+    `Pecah celengan! Rp ${saved.toLocaleString('id-ID')} + Bonus Rp ${PIGGY_BANK_BONUS.toLocaleString('id-ID')}`);
+
+  return `🎉 Celengan pecah! Rp ${saved.toLocaleString('id-ID')} + Bonus Rp ${PIGGY_BANK_BONUS.toLocaleString('id-ID')} masuk saldo!`;
+}
+
 // ===== LEADERBOARD =====
 
 export async function getLeaderboard(): Promise<Array<{ name: string; totalEarned: number; level: string; emoji: string }>> {

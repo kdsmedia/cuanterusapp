@@ -143,25 +143,10 @@ export default function GameScreen() {
     <View style={styles.container}>
       <StatusBar hidden />
 
-      {/* Top Bar */}
-      <View style={styles.topBar}>
-        <TouchableOpacity style={styles.exitButton} onPress={handleExitGame}>
-          <Text style={styles.exitButtonText}>✕</Text>
-        </TouchableOpacity>
-
-        <View style={styles.topBarCenter}>
-          <Text style={styles.gameTitle} numberOfLines={1}>
-            {gameName || gameInfo?.displayName || 'Game'}
-          </Text>
-        </View>
-
-        <View style={styles.balanceContainer}>
-          <Text style={styles.balanceLabel}>Saldo</Text>
-          <Text style={styles.balanceValue}>
-            Rp {gameBalance.toLocaleString('id-ID')}
-          </Text>
-        </View>
-      </View>
+      {/* Home Button - floating top left */}
+      <TouchableOpacity style={styles.homeButton} onPress={handleExitGame} activeOpacity={0.7}>
+        <Text style={styles.homeButtonIcon}>🏠</Text>
+      </TouchableOpacity>
 
       {/* WebView Game */}
       <View style={styles.webViewContainer}>
@@ -204,55 +189,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000',
   },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.darkSurface,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    paddingTop: 40,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  exitButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+  homeButton: {
+    position: 'absolute',
+    top: 44,
+    left: 12,
+    zIndex: 100,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  exitButtonText: {
-    color: colors.red,
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  topBarCenter: {
-    flex: 1,
-    marginHorizontal: 12,
-  },
-  gameTitle: {
-    color: colors.textPrimary,
-    fontWeight: '700',
-    fontSize: 15,
-  },
-  balanceContainer: {
-    alignItems: 'flex-end',
-    backgroundColor: 'rgba(6, 182, 212, 0.1)',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
     borderWidth: 1,
-    borderColor: 'rgba(6, 182, 212, 0.3)',
+    borderColor: 'rgba(255,255,255,0.2)',
   },
-  balanceLabel: {
-    color: colors.textMuted,
-    fontSize: 9,
-  },
-  balanceValue: {
-    color: colors.cyan,
-    fontWeight: '800',
-    fontSize: 13,
+  homeButtonIcon: {
+    fontSize: 18,
   },
   webViewContainer: {
     flex: 1,
