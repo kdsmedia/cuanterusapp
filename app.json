@@ -1,0 +1,101 @@
+{
+  "expo": {
+    "name": "CUANTERUS",
+    "slug": "cuanterus",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "cuanterus",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0f172a"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0f172a"
+      },
+      "package": "com.altomedia.cuanterusapp",
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_MEDIA_IMAGES",
+        "READ_CONTACTS",
+        "VIBRATE",
+        "RECEIVE_BOOT_COMPLETED",
+        "SCHEDULE_EXACT_ALARM",
+        "POST_NOTIFICATIONS",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "READ_PHONE_STATE"
+      ],
+      "googleServicesFile": "./google-services.json"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.altomedia.cuanterusapp",
+      "infoPlist": {
+        "NSCameraUsageDescription": "CUANTERUS membutuhkan akses kamera untuk scan QR Code pembayaran.",
+        "NSPhotoLibraryUsageDescription": "CUANTERUS membutuhkan akses galeri untuk menyimpan QR Code pembayaran.",
+        "NSPhotoLibraryAddUsageDescription": "CUANTERUS membutuhkan izin untuk menyimpan QR Code ke galeri.",
+        "NSContactsUsageDescription": "CUANTERUS membutuhkan akses kontak untuk mengundang teman.",
+        "NSLocationWhenInUseUsageDescription": "CUANTERUS membutuhkan lokasi untuk verifikasi transaksi.",
+        "NSUserTrackingUsageDescription": "Data ini digunakan untuk menampilkan iklan yang relevan."
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "CUANTERUS membutuhkan akses kamera untuk scan QR Code."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "CUANTERUS membutuhkan akses galeri untuk menyimpan QR Code.",
+          "savePhotosPermission": "CUANTERUS membutuhkan izin untuk menyimpan gambar ke galeri.",
+          "isAccessMediaLocationEnabled": true
+        }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "CUANTERUS membutuhkan akses kontak untuk mengundang teman."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#06b6d4"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "CUANTERUS membutuhkan lokasi untuk verifikasi transaksi."
+        }
+      ],
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-6881903056221433~4464124345",
+          "iosAppId": "ca-app-pub-6881903056221433~4464124345",
+          "userTrackingUsageDescription": "Data ini digunakan untuk menampilkan iklan yang relevan."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
