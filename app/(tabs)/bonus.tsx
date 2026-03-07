@@ -93,53 +93,7 @@ export default function BonusScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Level Card */}
-        <GlassCard style={{ marginBottom: 16 }}>
-          <View style={styles.levelRow}>
-            <Text style={{ fontSize: 36 }}>{level.current.emoji}</Text>
-            <View style={{ flex: 1, marginLeft: 14 }}>
-              <Text style={styles.levelName}>{level.current.name}</Text>
-              <Text style={styles.levelLabel}>Level {level.current.level}</Text>
-              {level.next && (
-                <>
-                  <View style={styles.levelBar}>
-                    <View style={[styles.levelFill, {
-                      width: `${Math.min(((userData?.totalEarned || 0) / level.next.minBalance) * 100, 100)}%`
-                    }]} />
-                  </View>
-                  <Text style={styles.levelNext}>
-                    {level.next.emoji} {level.next.name} — Rp {level.next.minBalance.toLocaleString('id-ID')}
-                  </Text>
-                </>
-              )}
-            </View>
-          </View>
-        </GlassCard>
-
-        {/* Spin Preview */}
-        <GlassCard style={{ marginBottom: 16 }}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>🎰 Lucky Spin</Text>
-            <TouchableOpacity onPress={() => router.push('/(tabs)/spin')}>
-              <Text style={styles.seeAll}>MAIN →</Text>
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.spinDesc}>
-            Nonton iklan → Spin roda → Dapat cuan!
-          </Text>
-          <View style={styles.prizeGrid}>
-            {SPIN_PRIZES.filter((v, i, a) => a.findIndex(p => p.value === v.value) === i)
-              .sort((a, b) => a.value - b.value)
-              .map((p, i) => (
-                <View key={i} style={[styles.prizeChip, { backgroundColor: p.color + '25', borderColor: p.color + '50' }]}>
-                  <Text style={[styles.prizeText, { color: p.color }]}>{p.label}</Text>
-                </View>
-              ))}
-          </View>
-          <Text style={styles.spinStatus}>
-            Sisa hari ini: {spinsLeft}/{MAX_DAILY_SPINS}
-          </Text>
-        </GlassCard>
+        {/* Level & Spin hidden — accessible via menu cards above */}
 
         {/* Voucher Section */}
         <GlassCard style={{ marginBottom: 16 }}>
