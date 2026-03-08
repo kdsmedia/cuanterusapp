@@ -16,7 +16,7 @@
     "expo": "~52.0.0",
     "expo-asset": "~11.0.5",
     "expo-auth-session": "~6.0.3",
-    "expo-audio": "~0.3.6",
+    "expo-av": "~15.0.2",
     "expo-camera": "~16.0.0",
     "expo-clipboard": "~7.0.0",
     "expo-constants": "~17.0.8",
@@ -58,7 +58,7 @@
   "expo": {
     "doctor": {
       "reactNativeDirectoryCheck": {
-        "exclude": ["firebase"],
+        "exclude": ["expo-av", "firebase"],
         "listUnknownPackages": false
       }
     }
