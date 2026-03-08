@@ -10,6 +10,7 @@ import {
   Dimensions,
   Vibration,
 } from 'react-native';
+import Svg, { Path, G, Text as SvgText, Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { Audio } from 'expo-av';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -20,7 +21,9 @@ import { showRewarded, isRewardedReady, reloadRewarded } from '@/lib/admob';
 import Toast from '@/components/Toast';
 import { colors } from '@/lib/theme';
 
-const WHEEL_SIZE = Math.min(Dimensions.get('window').width - 48, 320);
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const WHEEL_SIZE = Math.min(SCREEN_WIDTH - 48, 320);
+const WHEEL_RADIUS = WHEEL_SIZE / 2;
 const NUM_SEGMENTS = SPIN_PRIZES.length; // 20
 const SEGMENT_ANGLE = 360 / NUM_SEGMENTS; // 18°
 
@@ -65,6 +68,109 @@ async function playWin() {
   } catch (_) {}
 }
 
+// ===== SVG PIE SLICE HELPER =====
+function describeArc(cx: number, cy: number, r: number, startAngle: number, endAngle: number): string {
+  const startRad = ((startAngle - 90) * Math.PI) / 180;
+  const endRad = ((endAngle - 90) * Math.PI) / 180;
+  const x1 = cx + r * Math.cos(startRad);
+  const y1 = cy + r * Math.sin(startRad);
+  const x2 = cx + r * Math.cos(endRad);
+  const y2 = cy + r * Math.sin(endRad);
+  const largeArc = endAngle - startAngle > 180 ? 1 : 0;
+  return `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`;
+}
+
+// ===== WHEEL COMPONENT (static SVG) =====
+const WheelSvg = React.memo(() => {
+  const cx = WHEEL_RADIUS;
+  const cy = WHEEL_RADIUS;
+  const r = WHEEL_RADIUS - 4;
+  const textR = r * 0.68;
+  const dotR = r * 0.92;
+
+  return (
+    <Svg width={WHEEL_SIZE} height={WHEEL_SIZE} viewBox={`0 0 ${WHEEL_SIZE} ${WHEEL_SIZE}`}>
+      <Defs>
+        <LinearGradient id="rimGrad" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#fbbf24" />
+          <Stop offset="1" stopColor="#d97706" />
+        </LinearGradient>
+      </Defs>
+
+      {/* Outer rim */}
+      <Circle cx={cx} cy={cy} r={WHEEL_RADIUS} fill="url(#rimGrad)" />
+      <Circle cx={cx} cy={cy} r={WHEEL_RADIUS - 3} fill="none" stroke="#92400e" strokeWidth={1} />
+
+      {/* Segments */}
+      {SPIN_PRIZES.map((prize, i) => {
+        const startA = i * SEGMENT_ANGLE;
+        const endA = startA + SEGMENT_ANGLE;
+        const midA = startA + SEGMENT_ANGLE / 2;
+        const midRad = ((midA - 90) * Math.PI) / 180;
+
+        // Alternate slightly darker shade for contrast
+        const segColor = i % 2 === 0 ? prize.color : shadeColor(prize.color, -15);
+
+        // Text position
+        const tx = cx + textR * Math.cos(midRad);
+        const ty = cy + textR * Math.sin(midRad);
+
+        // Dot position (outer edge decoration)
+        const dx = cx + dotR * Math.cos(midRad);
+        const dy = cy + dotR * Math.sin(midRad);
+
+        return (
+          <G key={i}>
+            <Path d={describeArc(cx, cy, r, startA, endA)} fill={segColor} stroke="#0f172a" strokeWidth={0.8} />
+            {/* Segment divider lines */}
+            <Path
+              d={describeArc(cx, cy, r, startA, startA + 0.3)}
+              fill="none"
+              stroke="rgba(255,255,255,0.15)"
+              strokeWidth={1}
+            />
+            {/* Prize text */}
+            <SvgText
+              x={tx}
+              y={ty}
+              fill="#fff"
+              fontSize={8.5}
+              fontWeight="bold"
+              textAnchor="middle"
+              alignmentBaseline="central"
+              rotation={midA}
+              origin={`${tx}, ${ty}`}
+            >
+              {prize.label.replace('Rp ', '').replace('.000', 'K')}
+            </SvgText>
+            {/* Outer dots */}
+            <Circle cx={dx} cy={dy} r={2.5} fill="rgba(255,255,255,0.5)" />
+          </G>
+        );
+      })}
+
+      {/* Inner ring shadow */}
+      <Circle cx={cx} cy={cy} r={r * 0.28} fill="#0f172a" opacity={0.3} />
+
+      {/* Center circle */}
+      <Circle cx={cx} cy={cy} r={r * 0.24} fill="#0f172a" stroke="#fbbf24" strokeWidth={3} />
+      <SvgText x={cx} y={cy + 1} fontSize={18} textAnchor="middle" alignmentBaseline="central" fill="#fbbf24">
+        💰
+      </SvgText>
+    </Svg>
+  );
+});
+
+function shadeColor(color: string, percent: number): string {
+  const num = parseInt(color.replace('#', ''), 16);
+  const amt = Math.round(2.55 * percent);
+  const R = Math.max(0, Math.min(255, (num >> 16) + amt));
+  const G = Math.max(0, Math.min(255, ((num >> 8) & 0x00FF) + amt));
+  const B = Math.max(0, Math.min(255, (num & 0x0000FF) + amt));
+  return `#${((1 << 24) + (R << 16) + (G << 8) + B).toString(16).slice(1)}`;
+}
+
+// ===== MAIN SCREEN =====
 export default function SpinScreen() {
   const { firebaseUser, userData } = useAuth();
   const [spinning, setSpinning] = useState(false);
@@ -74,6 +180,7 @@ export default function SpinScreen() {
   const rotation = useRef(new Animated.Value(0)).current;
   const currentRotation = useRef(0);
   const tickInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const glowAnim = useRef(new Animated.Value(0)).current;
 
   const spinsToday = getSpinCountToday(userData);
   const spinsLeft = MAX_DAILY_SPINS - spinsToday;
@@ -89,6 +196,20 @@ export default function SpinScreen() {
     };
   }, []);
 
+  // Idle glow pulse animation
+  useEffect(() => {
+    if (!spinning) {
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(glowAnim, { toValue: 1, duration: 1500, useNativeDriver: false }),
+          Animated.timing(glowAnim, { toValue: 0, duration: 1500, useNativeDriver: false }),
+        ])
+      );
+      loop.start();
+      return () => loop.stop();
+    }
+  }, [spinning]);
+
   // Pick weighted random prize
   const pickPrize = (): { index: number; value: number } => {
     const totalWeight = SPIN_REAL_WEIGHTS.reduce((sum, w) => sum + w.weight, 0);
@@ -99,7 +220,6 @@ export default function SpinScreen() {
         return { index: w.index, value: SPIN_PRIZES[w.index].value };
       }
     }
-    // Fallback
     return { index: 0, value: SPIN_PRIZES[0].value };
   };
 
@@ -111,10 +231,15 @@ export default function SpinScreen() {
     setResultValue(0);
 
     try {
-      // Show ad if ready
+      // Show rewarded ad first — wait for result
       if (isRewardedReady()) {
-        await showRewarded();
+        const adWatched = await showRewarded();
+        if (!adWatched) {
+          // Ad was dismissed early, still allow spin but log it
+          console.log('[Spin] Ad dismissed or failed, proceeding with spin');
+        }
       } else {
+        // Ad not ready, preload for next time
         reloadRewarded();
       }
 
@@ -123,59 +248,44 @@ export default function SpinScreen() {
       const prizeData = SPIN_PRIZES[prize.index];
 
       // Calculate target rotation
-      // Wheel rotates clockwise; pointer is at top
-      // Prize at index i starts at angle (i * SEGMENT_ANGLE)
-      // We want the center of that segment under the pointer
       const prizeCenter = prize.index * SEGMENT_ANGLE + SEGMENT_ANGLE / 2;
-      // To land on this segment, rotate so that prizeCenter aligns with top (0°)
       const targetAngle = 360 - prizeCenter;
-      // Add random offset within segment for natural feel
       const randomOffset = (Math.random() - 0.5) * (SEGMENT_ANGLE * 0.6);
-      const fullSpins = (6 + Math.floor(Math.random() * 3)) * 360; // 6-8 full rotations
+      const fullSpins = (6 + Math.floor(Math.random() * 3)) * 360;
       const toValue = currentRotation.current + fullSpins + targetAngle + randomOffset;
 
-      // Start tick sounds during spin
-      let tickSpeed = 50;
-      tickInterval.current = setInterval(() => {
-        playTick();
-      }, tickSpeed);
+      // Start tick sounds
+      tickInterval.current = setInterval(() => playTick(), 50);
 
-      // Gradually slow down tick speed
-      const slowdownTimer = setTimeout(() => {
+      // Gradually slow down tick
+      const slowdown1 = setTimeout(() => {
         if (tickInterval.current) clearInterval(tickInterval.current);
-        tickInterval.current = setInterval(() => {
-          playTick();
-        }, 150);
+        tickInterval.current = setInterval(() => playTick(), 150);
       }, 2500);
 
-      const slowdownTimer2 = setTimeout(() => {
+      const slowdown2 = setTimeout(() => {
         if (tickInterval.current) clearInterval(tickInterval.current);
-        tickInterval.current = setInterval(() => {
-          playTick();
-        }, 300);
+        tickInterval.current = setInterval(() => playTick(), 300);
       }, 4000);
 
-      // Animate with natural deceleration
+      // Animate
       Animated.timing(rotation, {
         toValue,
         duration: 5500,
-        easing: Easing.out(Easing.quad), // Natural deceleration
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }).start(async () => {
         currentRotation.current = toValue;
 
-        // Stop tick sounds
-        clearTimeout(slowdownTimer);
-        clearTimeout(slowdownTimer2);
+        clearTimeout(slowdown1);
+        clearTimeout(slowdown2);
         if (tickInterval.current) {
           clearInterval(tickInterval.current);
           tickInterval.current = null;
         }
 
-        // Play win sound & vibrate
         await playWin();
 
-        // Claim reward
         try {
           const res = await claimSpinReward(firebaseUser.uid, prizeData.value);
           setResult(`🎉 ${prizeData.label}!`);
@@ -201,108 +311,10 @@ export default function SpinScreen() {
     outputRange: ['0deg', '360deg'],
   });
 
-  // Render wheel segments
-  const renderWheel = () => {
-    const radius = WHEEL_SIZE / 2;
-    const innerRadius = radius * 0.3; // Center circle radius
-
-    return (
-      <Animated.View
-        style={[
-          styles.wheel,
-          {
-            width: WHEEL_SIZE,
-            height: WHEEL_SIZE,
-            borderRadius: WHEEL_SIZE / 2,
-            transform: [{ rotate: spinInterpolation }],
-          },
-        ]}
-      >
-        {SPIN_PRIZES.map((prize, i) => {
-          const startAngle = i * SEGMENT_ANGLE - 90; // -90 to start from top
-          const midAngle = startAngle + SEGMENT_ANGLE / 2;
-          const midRad = (midAngle * Math.PI) / 180;
-          const textRadius = radius * 0.65;
-          const textX = radius + textRadius * Math.cos(midRad);
-          const textY = radius + textRadius * Math.sin(midRad);
-
-          return (
-            <View key={i} style={StyleSheet.absoluteFill}>
-              {/* Segment background using a positioned view */}
-              <View
-                style={[
-                  styles.segmentSlice,
-                  {
-                    backgroundColor: prize.color,
-                    transform: [
-                      { translateX: radius - 1 },
-                      { translateY: 0 },
-                      { rotate: `${startAngle + SEGMENT_ANGLE / 2}deg` },
-                      { translateY: -radius / 2 },
-                    ],
-                    width: 2,
-                    height: radius,
-                    left: 0,
-                    top: radius,
-                  },
-                ]}
-              />
-              {/* Prize text */}
-              <View
-                style={[
-                  styles.segmentLabel,
-                  {
-                    left: textX - 28,
-                    top: textY - 10,
-                    transform: [{ rotate: `${midAngle + 90}deg` }],
-                  },
-                ]}
-              >
-                <Text style={styles.segmentText} numberOfLines={1}>
-                  {prize.label.replace('Rp ', '')}
-                </Text>
-              </View>
-            </View>
-          );
-        })}
-
-        {/* Colored segments - simplified approach with pie slices */}
-        {SPIN_PRIZES.map((prize, i) => {
-          const angle = i * SEGMENT_ANGLE;
-          const rad = ((angle + SEGMENT_ANGLE / 2 - 90) * Math.PI) / 180;
-          const dotR = radius * 0.82;
-          const x = radius + dotR * Math.cos(rad) - 4;
-          const y = radius + dotR * Math.sin(rad) - 4;
-          return (
-            <View
-              key={`dot-${i}`}
-              style={{
-                position: 'absolute',
-                left: x,
-                top: y,
-                width: 8,
-                height: 8,
-                borderRadius: 4,
-                backgroundColor: '#fff',
-                opacity: 0.6,
-              }}
-            />
-          );
-        })}
-
-        {/* Center circle */}
-        <View style={[styles.centerCircle, {
-          width: WHEEL_SIZE * 0.25,
-          height: WHEEL_SIZE * 0.25,
-          borderRadius: WHEEL_SIZE * 0.125,
-          left: WHEEL_SIZE * 0.375,
-          top: WHEEL_SIZE * 0.375,
-        }]}>
-          <Text style={{ fontSize: 22 }}>💰</Text>
-        </View>
-      </Animated.View>
-    );
-  };
+  const glowOpacity = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.2, 0.6],
+  });
 
   return (
     <View style={styles.container}>
@@ -318,34 +330,52 @@ export default function SpinScreen() {
 
       {/* Spin Counter */}
       <View style={styles.counterRow}>
-        <Text style={styles.counterText}>Sisa spin: </Text>
+        <Text style={styles.counterText}>Sisa spin hari ini: </Text>
         <Text style={[styles.counterNum, maxedOut && { color: colors.red }]}>
           {spinsLeft}/{MAX_DAILY_SPINS}
         </Text>
       </View>
 
       {/* Wheel Container */}
-      <View style={[styles.wheelContainer, { width: WHEEL_SIZE + 24, height: WHEEL_SIZE + 24 }]}>
-        {/* Pointer */}
+      <View style={styles.wheelWrapper}>
+        {/* Glow effect behind wheel */}
+        <Animated.View
+          style={[
+            styles.wheelGlow,
+            {
+              width: WHEEL_SIZE + 40,
+              height: WHEEL_SIZE + 40,
+              borderRadius: (WHEEL_SIZE + 40) / 2,
+              opacity: spinning ? 0.5 : glowOpacity,
+            },
+          ]}
+        />
+
+        {/* Pointer at top */}
         <View style={styles.pointer}>
           <View style={styles.pointerTriangle} />
+          <View style={styles.pointerDot} />
         </View>
 
-        {/* Outer ring decorations */}
-        <View style={[styles.outerRing, {
-          width: WHEEL_SIZE + 16,
-          height: WHEEL_SIZE + 16,
-          borderRadius: (WHEEL_SIZE + 16) / 2,
-        }]}>
-          {renderWheel()}
-        </View>
+        {/* Rotating Wheel */}
+        <Animated.View
+          style={{
+            width: WHEEL_SIZE,
+            height: WHEEL_SIZE,
+            transform: [{ rotate: spinInterpolation }],
+          }}
+        >
+          <WheelSvg />
+        </Animated.View>
       </View>
 
       {/* Result */}
       {result && (
-        <View style={styles.resultBox}>
+        <Animated.View style={styles.resultBox}>
+          <Text style={styles.resultEmoji}>🎉</Text>
           <Text style={styles.resultText}>{result}</Text>
-        </View>
+          <Text style={styles.resultSubtext}>Ditambahkan ke saldo kamu</Text>
+        </Animated.View>
       )}
 
       {/* Spin Button */}
@@ -356,7 +386,7 @@ export default function SpinScreen() {
         activeOpacity={0.8}
       >
         {spinning ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View style={styles.spinBtnRow}>
             <ActivityIndicator color="#fff" size="small" />
             <Text style={styles.spinBtnText}>MEMUTAR...</Text>
           </View>
@@ -366,6 +396,11 @@ export default function SpinScreen() {
           </Text>
         )}
       </TouchableOpacity>
+
+      {/* Ad hint */}
+      {!maxedOut && !spinning && (
+        <Text style={styles.adHint}>Tonton iklan untuk spin gratis</Text>
+      )}
     </View>
   );
 }
@@ -378,96 +413,96 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingHorizontal: 16,
   },
-  title: { fontSize: 26, fontWeight: '900', color: colors.textPrimary },
-  subtitle: { fontSize: 13, color: colors.textSecondary, marginTop: 4, marginBottom: 12 },
-  counterRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  title: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: colors.textPrimary,
+    letterSpacing: 0.5,
+  },
+  subtitle: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: 4,
+    marginBottom: 12,
+  },
+  counterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    backgroundColor: colors.darkSurface,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
   counterText: { fontSize: 14, color: colors.textSecondary },
   counterNum: { fontSize: 14, fontWeight: '900', color: colors.cyan },
 
   // Wheel
-  wheelContainer: {
-    justifyContent: 'center',
+  wheelWrapper: {
     alignItems: 'center',
-    marginBottom: 16,
-  },
-  outerRing: {
     justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 4,
-    borderColor: colors.yellow,
-    backgroundColor: colors.darkSurface,
+    marginBottom: 20,
   },
-  wheel: {
-    backgroundColor: colors.darkSurface,
-    overflow: 'hidden',
-  },
-  segmentSlice: {
+  wheelGlow: {
     position: 'absolute',
-    opacity: 0.6,
-  },
-  segmentLabel: {
-    position: 'absolute',
-    width: 56,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  segmentText: {
-    color: '#fff',
-    fontSize: 9,
-    fontWeight: '900',
-    textShadowColor: 'rgba(0,0,0,0.8)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  },
-  centerCircle: {
-    position: 'absolute',
-    backgroundColor: colors.darkBg,
-    borderWidth: 3,
-    borderColor: colors.yellow,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 4,
-    elevation: 5,
+    backgroundColor: colors.yellow,
+    shadowColor: colors.yellow,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 30,
+    elevation: 10,
   },
 
   // Pointer
   pointer: {
     position: 'absolute',
-    top: -4,
+    top: -12,
     zIndex: 20,
     alignItems: 'center',
   },
   pointerTriangle: {
     width: 0,
     height: 0,
-    borderLeftWidth: 14,
-    borderRightWidth: 14,
-    borderTopWidth: 24,
+    borderLeftWidth: 16,
+    borderRightWidth: 16,
+    borderTopWidth: 28,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
-    borderTopColor: colors.yellow,
+    borderTopColor: '#fbbf24',
+  },
+  pointerDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#d97706',
+    marginTop: -6,
   },
 
   // Result
   resultBox: {
-    backgroundColor: 'rgba(251,191,36,0.15)',
+    backgroundColor: 'rgba(251,191,36,0.12)',
     borderWidth: 1,
     borderColor: 'rgba(251,191,36,0.3)',
-    borderRadius: 16,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    borderRadius: 20,
+    paddingHorizontal: 28,
+    paddingVertical: 14,
     marginBottom: 16,
+    alignItems: 'center',
+  },
+  resultEmoji: {
+    fontSize: 28,
+    marginBottom: 4,
   },
   resultText: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '900',
     color: colors.yellow,
     textAlign: 'center',
+  },
+  resultSubtext: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 4,
   },
 
   // Spin Button
@@ -475,21 +510,34 @@ const styles = StyleSheet.create({
     backgroundColor: colors.purple,
     paddingHorizontal: 48,
     paddingVertical: 18,
-    borderRadius: 24,
+    borderRadius: 28,
     shadowColor: colors.purple,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
-    shadowRadius: 8,
+    shadowRadius: 12,
     elevation: 6,
+    minWidth: 220,
+    alignItems: 'center',
   },
   spinBtnDisabled: {
     backgroundColor: '#334155',
     shadowOpacity: 0,
+    elevation: 0,
+  },
+  spinBtnRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   spinBtnText: {
     color: '#fff',
     fontSize: 18,
     fontWeight: '900',
     letterSpacing: 1,
+  },
+  adHint: {
+    marginTop: 12,
+    fontSize: 12,
+    color: colors.textMuted,
   },
 });

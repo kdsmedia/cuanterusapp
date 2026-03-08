@@ -27,7 +27,6 @@ let interstitialAd: InterstitialAd | null = null;
 let interstitialLoaded = false;
 
 function createInterstitial() {
-  // Cleanup old listeners
   if (interstitialAd) {
     try { interstitialAd.removeAllListeners(); } catch (_) {}
   }
@@ -36,21 +35,19 @@ function createInterstitial() {
     requestNonPersonalizedAdsOnly: true,
   });
 
-  interstitialAd.addAdEventListener(AdEventType.LOADED, () => {
+  const unsubLoad = interstitialAd.addAdEventListener(AdEventType.LOADED, () => {
     interstitialLoaded = true;
     console.log('[AdMob] Interstitial loaded');
   });
 
-  interstitialAd.addAdEventListener(AdEventType.CLOSED, () => {
+  const unsubClose = interstitialAd.addAdEventListener(AdEventType.CLOSED, () => {
     interstitialLoaded = false;
-    // Auto-reload after closed
     setTimeout(() => createInterstitial(), 1000);
   });
 
-  interstitialAd.addAdEventListener(AdEventType.ERROR, (error) => {
+  const unsubError = interstitialAd.addAdEventListener(AdEventType.ERROR, (error) => {
     interstitialLoaded = false;
     console.log('[AdMob] Interstitial error:', error);
-    // Retry after 30s
     setTimeout(() => createInterstitial(), 30000);
   });
 
@@ -60,7 +57,7 @@ function createInterstitial() {
 export function showInterstitial(): Promise<boolean> {
   return new Promise((resolve) => {
     if (interstitialLoaded && interstitialAd) {
-      interstitialAd.show();
+      interstitialAd.show().catch(() => resolve(false));
       resolve(true);
     } else {
       console.log('[AdMob] Interstitial not ready');
@@ -73,9 +70,9 @@ export function showInterstitial(): Promise<boolean> {
 
 let rewardedAd: RewardedAd | null = null;
 let rewardedLoaded = false;
+let isShowingRewarded = false;
 
 function createRewarded() {
-  // Cleanup old listeners
   if (rewardedAd) {
     try { rewardedAd.removeAllListeners(); } catch (_) {}
   }
@@ -92,7 +89,10 @@ function createRewarded() {
   rewardedAd.addAdEventListener(AdEventType.ERROR, (error) => {
     rewardedLoaded = false;
     console.log('[AdMob] Rewarded error:', error);
-    setTimeout(() => createRewarded(), 30000);
+    // Only auto-retry if not currently showing
+    if (!isShowingRewarded) {
+      setTimeout(() => createRewarded(), 30000);
+    }
   });
 
   rewardedAd.load();
@@ -108,45 +108,51 @@ export function showRewarded(): Promise<boolean> {
 
     let rewarded = false;
     let resolved = false;
+    isShowingRewarded = true;
 
-    const cleanup = () => {
-      try { unsubReward(); } catch (_) {}
-      try { unsubClose(); } catch (_) {}
+    const safeResolve = (value: boolean) => {
+      if (!resolved) {
+        resolved = true;
+        isShowingRewarded = false;
+        resolve(value);
+      }
     };
 
     // Listen for reward earned
-    const unsubReward = rewardedAd.addAdEventListener(
+    const unsubReward = rewardedAd!.addAdEventListener(
       RewardedAdEventType.EARNED_REWARD,
-      () => {
+      (reward) => {
         rewarded = true;
-        console.log('[AdMob] User earned reward');
+        console.log('[AdMob] User earned reward:', reward);
       }
     );
 
     // Listen for ad closed — resolve here so we know final state
-    const unsubClose = rewardedAd.addAdEventListener(
+    const unsubClose = rewardedAd!.addAdEventListener(
       AdEventType.CLOSED,
       () => {
-        cleanup();
+        try { unsubReward(); } catch (_) {}
+        try { unsubClose(); } catch (_) {}
         rewardedLoaded = false;
-        if (!resolved) {
-          resolved = true;
-          resolve(rewarded);
-        }
+        safeResolve(rewarded);
         // Reload next ad
         setTimeout(() => createRewarded(), 1000);
       }
     );
 
-    rewardedAd.show().catch(() => {
-      cleanup();
+    rewardedAd!.show().catch((err) => {
+      console.log('[AdMob] Rewarded show error:', err);
+      try { unsubReward(); } catch (_) {}
+      try { unsubClose(); } catch (_) {}
       rewardedLoaded = false;
-      if (!resolved) {
-        resolved = true;
-        resolve(false);
-      }
+      safeResolve(false);
       setTimeout(() => createRewarded(), 5000);
     });
+
+    // Safety timeout — if ad doesn't close within 60s, resolve false
+    setTimeout(() => {
+      safeResolve(false);
+    }, 60000);
   });
 }
 
@@ -154,14 +160,13 @@ export function showRewarded(): Promise<boolean> {
 
 export function initAdMob() {
   console.log('[AdMob] Initializing...');
-  console.log('[AdMob] App ID: ca-app-pub-6881903056221433~4464124345');
   console.log('[AdMob] Using test ads:', USE_TEST_ADS);
   createInterstitial();
   createRewarded();
 }
 
 export function isRewardedReady() {
-  return rewardedLoaded;
+  return rewardedLoaded && !isShowingRewarded;
 }
 
 export function isInterstitialReady() {
@@ -170,7 +175,7 @@ export function isInterstitialReady() {
 
 /** Force reload rewarded ad (e.g. after failed attempt) */
 export function reloadRewarded() {
-  if (!rewardedLoaded) {
+  if (!rewardedLoaded && !isShowingRewarded) {
     createRewarded();
   }
 }
