@@ -60,8 +60,8 @@ export default function GamesScreen() {
       setToast({ visible: true, message: 'Login dulu untuk bermain!', type: 'warning' });
       return;
     }
-    if (balance <= 0) {
-      setToast({ visible: true, message: 'Saldo tidak cukup! Deposit atau klaim bonus dulu.', type: 'warning' });
+    if (balance < 10) {
+      setToast({ visible: true, message: 'Saldo minimal Rp 10 untuk bermain. Klaim bonus dulu!', type: 'warning' });
       return;
     }
     router.push({ pathname: '/game', params: { gameId: game.id, gameName: game.displayName } });

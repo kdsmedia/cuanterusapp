@@ -82,7 +82,7 @@ export async function startGameSession(uid: string, gameId: string): Promise<str
   if (userData.blocked) throw new Error('Akun diblokir');
 
   const balance = userData.balance || 0;
-  if (balance <= 0) throw new Error('Saldo tidak cukup untuk bermain');
+  if (balance < 10) throw new Error('Saldo minimal Rp 10 untuk bermain');
 
   // Buat sesi game di Firestore
   const sessionRef = doc(db, GAME_SESSIONS_PATH, `${uid}_active`);

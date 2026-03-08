@@ -1,10 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
-  TouchableOpacity,
-  ActivityIndicator,
   Alert,
   BackHandler,
   StatusBar,
@@ -16,11 +13,8 @@ import {
   startGameSession,
   endGameSession,
   updateGameBalance,
-  getGameUrl,
-  WEBVIEW_BRIDGE_JS,
-  GAME_LIST,
 } from '@/lib/game-bridge';
-import { colors } from '@/lib/theme';
+import { generateSlotHTML } from '@/lib/slot-engine';
 
 export default function GameScreen() {
   const { gameId, gameName } = useLocalSearchParams<{ gameId: string; gameName: string }>();
@@ -28,7 +22,6 @@ export default function GameScreen() {
   const router = useRouter();
 
   const webViewRef = useRef<WebView>(null);
-  const [loading, setLoading] = useState(true);
   const [gameBalance, setGameBalance] = useState(userData?.balance ?? 0);
   const [sessionStarted, setSessionStarted] = useState(false);
   const [exiting, setExiting] = useState(false);
@@ -47,7 +40,7 @@ export default function GameScreen() {
   useEffect(() => {
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
       handleExitGame();
-      return true; // Prevent default back
+      return true;
     });
     return () => backHandler.remove();
   }, [gameBalance]);
@@ -70,23 +63,22 @@ export default function GameScreen() {
 
       switch (data.type) {
         case 'balance_update':
-          const newBalance = parseFloat(data.balance);
+          const newBalance = Math.round(parseFloat(data.balance));
           setGameBalance(newBalance);
-          // Sync ke Firestore (non-blocking)
           updateGameBalance(uid, newBalance).catch(() => {});
           break;
 
         case 'exit_game':
-          const finalBalance = parseFloat(data.balance);
+          const finalBalance = Math.round(parseFloat(data.balance));
           await handleEndSession(finalBalance);
           break;
 
         case 'bridge_ready':
-          console.log('Game bridge ready');
+          console.log('[Game] Bridge ready');
           break;
       }
     } catch (e) {
-      console.error('WebView message error:', e);
+      console.error('[Game] WebView message error:', e);
     }
   }, [uid]);
 
@@ -114,7 +106,7 @@ export default function GameScreen() {
         router.back();
       }
     } catch (e) {
-      console.error('End session error:', e);
+      console.error('[Game] End session error:', e);
       router.back();
     }
   };
@@ -135,51 +127,33 @@ export default function GameScreen() {
     );
   };
 
-  // Generate game URL
-  const gameUrl = getGameUrl(gameId!, uid, balance);
-  const gameInfo = GAME_LIST.find(g => g.id === gameId);
+  // Generate self-contained HTML game
+  const gameHTML = generateSlotHTML(gameId!, balance);
 
   return (
     <View style={styles.container}>
       <StatusBar hidden />
-
-      {/* Home Button - floating top left */}
-      <TouchableOpacity style={styles.homeButton} onPress={handleExitGame} activeOpacity={0.7}>
-        <Text style={styles.homeButtonIcon}>🏠</Text>
-      </TouchableOpacity>
-
-      {/* WebView Game */}
-      <View style={styles.webViewContainer}>
-        {loading && (
-          <View style={styles.loadingOverlay}>
-            <ActivityIndicator size="large" color={colors.cyan} />
-            <Text style={styles.loadingText}>Memuat {gameName}...</Text>
-          </View>
-        )}
-        <WebView
-          ref={webViewRef}
-          source={{ uri: gameUrl }}
-          style={styles.webView}
-          injectedJavaScript={WEBVIEW_BRIDGE_JS}
-          onMessage={handleWebViewMessage}
-          onLoadStart={() => setLoading(true)}
-          onLoadEnd={() => setLoading(false)}
-          javaScriptEnabled={true}
-          domStorageEnabled={true}
-          allowsInlineMediaPlayback={true}
-          mediaPlaybackRequiresUserAction={false}
-          scalesPageToFit={true}
-          originWhitelist={['*']}
-          onError={() => {
-            setLoading(false);
-            Alert.alert(
-              'Gagal Memuat',
-              'Game tidak bisa dimuat. Periksa koneksi internet atau hubungi admin.',
-              [{ text: 'Kembali', onPress: () => router.back() }]
-            );
-          }}
-        />
-      </View>
+      <WebView
+        ref={webViewRef}
+        source={{ html: gameHTML }}
+        style={styles.webView}
+        onMessage={handleWebViewMessage}
+        javaScriptEnabled={true}
+        domStorageEnabled={true}
+        allowsInlineMediaPlayback={true}
+        mediaPlaybackRequiresUserAction={false}
+        originWhitelist={['*']}
+        scrollEnabled={false}
+        bounces={false}
+        overScrollMode="never"
+        onError={() => {
+          Alert.alert(
+            'Gagal Memuat',
+            'Game tidak bisa dimuat.',
+            [{ text: 'Kembali', onPress: () => router.back() }]
+          );
+        }}
+      />
     </View>
   );
 }
@@ -189,41 +163,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000',
   },
-  homeButton: {
-    position: 'absolute',
-    top: 44,
-    left: 12,
-    zIndex: 100,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  homeButtonIcon: {
-    fontSize: 18,
-  },
-  webViewContainer: {
-    flex: 1,
-    position: 'relative',
-  },
   webView: {
     flex: 1,
     backgroundColor: '#000',
-  },
-  loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
-  },
-  loadingText: {
-    color: colors.textSecondary,
-    marginTop: 12,
-    fontSize: 14,
   },
 });
