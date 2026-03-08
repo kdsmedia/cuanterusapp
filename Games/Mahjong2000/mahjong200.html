@@ -216,16 +216,23 @@
         }
 
         /* GAYA IKON TOMBOL KONTROL */
-        .control-btn i {
-            /* Semua ikon + / - / bolt */
-            color: white !important; /* Ubah ikon menjadi Putih */
-            text-shadow: 0 0 5px var(--gold-accent); /* Tambahkan Bayangan Kuning Emas */
+        .control-btn i,
+        .control-btn-icon {
+            color: white !important;
+            text-shadow: 0 0 5px var(--gold-accent);
+            font-size: 20px;
+            line-height: 1;
+            display: inline-block;
         }
         
         #spin-btn i {
-            /* Ikon putaran utama */
-            color: var(--dark-red) !important; /* Ikon Putaran tetap Merah Gelap */
-            text-shadow: 0 0 3px #fff; /* Tambahkan Bayangan Putih untuk kontras pada latar belakang emas */
+            color: var(--dark-red) !important;
+            text-shadow: 0 0 3px #fff;
+            font-size: 32px;
+            line-height: 1;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
         }
 
         /* Gaya Tombol FREE/Iklan */
@@ -250,7 +257,7 @@
             opacity: 0.6;
         }
     </style>
-    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
 </head>
 <body class="bg-brown-bg">
 
@@ -259,8 +266,8 @@
     <!-- HEADER BAR --><div class="flex justify-between items-center text-white mb-2 relative z-10">
         <!-- GROUP KIRI (Menu + Free Reward) -->
         <div class="flex items-center space-x-2">
-            <button class="text-3xl p-2 rounded-full bg-dark-red border-2 border-gold-accent hover:opacity-80">
-                <i class="fas fa-bars control-btn-icon"></i>
+            <button class="flex justify-center items-center rounded-full border-2 border-gold-accent hover:opacity-80" style="width:40px;height:40px;background-color:var(--dark-red);">
+                <i class="fas fa-bars" style="color:white;font-size:16px;"></i>
             </button>
             <!-- TOMBOL FREE REWARD BARU -->
             <button id="free-reward-btn" class="active:scale-95">
@@ -316,23 +323,23 @@
     <!-- CONTROL BUTTONS -->
     <div class="flex justify-around items-center relative z-10 pt-2">
         <!-- Turbo/Lightning Button -->
-        <button id="turbo-btn" class="control-btn bg-dark-red p-3 rounded-full border-2 border-gold-accent text-gold-accent text-2xl hover:bg-red-900 active:scale-90 transition">
-            <i class="fas fa-bolt control-btn-icon"></i>
+        <button id="turbo-btn" class="control-btn flex justify-center items-center rounded-full border-2 border-gold-accent hover:bg-red-900 active:scale-90 transition" style="width:48px;height:48px;background-color:var(--dark-red);">
+            <i class="fas fa-bolt"></i>
         </button>
         
         <!-- Bet Minus Button -->
-        <button id="bet-minus-btn" class="control-btn bg-dark-red p-3 rounded-full border-2 border-gold-accent text-gold-accent text-2xl hover:bg-red-900 active:scale-90 transition">
-            <i class="fas fa-minus control-btn-icon"></i>
+        <button id="bet-minus-btn" class="control-btn flex justify-center items-center rounded-full border-2 border-gold-accent hover:bg-red-900 active:scale-90 transition" style="width:48px;height:48px;background-color:var(--dark-red);">
+            <i class="fas fa-minus"></i>
         </button>
 
         <!-- Main Spin Button -->
-        <button id="spin-btn" class="w-20 h-20 rounded-full bg-gold-accent flex justify-center items-center transform transition-transform duration-100 hover:scale-105 active:scale-95 shadow-2xl" style="border: 5px solid var(--red-primary); box-shadow: 0 0 20px var(--gold-accent);">
-            <i class="fas fa-redo-alt text-4xl text-dark-red"></i>
+        <button id="spin-btn" class="flex justify-center items-center rounded-full transform transition-transform duration-100 hover:scale-105 active:scale-95" style="width:72px;height:72px;background-color:var(--gold-accent);border:5px solid var(--red-primary);box-shadow:0 0 20px var(--gold-accent);">
+            <i class="fas fa-rotate-right"></i>
         </button>
         
         <!-- Bet Plus Button -->
-        <button id="bet-plus-btn" class="control-btn bg-dark-red p-3 rounded-full border-2 border-gold-accent text-gold-accent text-2xl hover:bg-red-900 active:scale-90 transition">
-            <i class="fas fa-plus control-btn-icon"></i>
+        <button id="bet-plus-btn" class="control-btn flex justify-center items-center rounded-full border-2 border-gold-accent hover:bg-red-900 active:scale-90 transition" style="width:48px;height:48px;background-color:var(--dark-red);">
+            <i class="fas fa-plus"></i>
         </button>
     </div>
 
