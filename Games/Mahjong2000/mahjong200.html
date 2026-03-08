@@ -1,0 +1,932 @@
+<!DOCTYPE l/ctag/span>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2000 WAYS Mahjong Slot Clone</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        :root {
+            --red-primary: #9b2226;
+            --gold-accent: #ffb703;
+            --dark-red: #660708;
+            --brown-bg: #540b0e;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--brown-bg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 10px;
+        }
+        #game-container {
+            width: 100%;
+            max-width: 480px; /* Lebar khas layar ponsel */
+            aspect-ratio: 9/16; /* Rasio aspek khas ponsel */
+            background: linear-gradient(to top, var(--dark-red), var(--red-primary));
+            border-radius: 20px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5), inset 0 0 50px rgba(255, 255, 255, 0.1);
+            position: relative;
+            padding: 15px 10px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Simulasi background scroll/dragon/awan */
+        #game-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('https://placehold.co/480x850/660708/FFFFFF?text=Mahjong+Background') no-repeat center center/cover;
+            opacity: 0.3;
+            z-index: 0;
+        }
+        
+        /* Gaya Grid Reel - Container utama untuk 5 kolom */
+        #game-grid {
+            position: relative;
+            z-index: 10;
+            background-color: rgba(0, 0, 0, 0.3);
+            border: 4px solid var(--gold-accent);
+            border-radius: 10px;
+            padding: 5px;
+            margin-top: 10px;
+            box-shadow: inset 0 0 15px rgba(255, 255, 255, 0.2);
+            
+            /* Struktur Grid Baru: 5 Kolom Vertikal */
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 5px;
+            overflow: hidden; /* Penting: Hanya menampilkan area 5x5 */
+            flex-grow: 1; /* Memastikan grid mengisi ruang yang tersedia */
+        }
+
+        /* Container untuk satu reel (kolom) - Menyembunyikan simbol yang berputar */
+        .reel-column {
+            overflow: hidden;
+            position: relative;
+            height: 100%;
+        }
+
+        /* Reel (Konten yang bergerak) */
+        .reel {
+            display: flex;
+            flex-direction: column;
+            position: absolute;
+            width: 100%;
+            top: 0;
+            left: 0;
+            /* Transisi Awal: Diatur di JS untuk kontrol halus */
+            will-change: transform;
+        }
+
+        /* Gaya Tile */
+        .tile {
+            height: calc((100% - 4 * 5px) / 5); /* Tinggi 1/5 dari kolom dikurangi 4 gap */
+            margin-bottom: 5px; /* Gap antar tile */
+            width: 100%;
+            background-color: #f0f0f0;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+            font-weight: 900;
+            color: var(--dark-red);
+            box-shadow: inset 0 -4px 0 #ccc, 0 2px 4px rgba(0, 0, 0, 0.3);
+            flex-shrink: 0; /* Penting untuk flex-col */
+            padding: 3px;
+            transition: opacity 0.3s ease-out, transform 0.3s ease-out; /* Untuk animasi Tumble */
+        }
+        .reel .tile:last-child {
+            margin-bottom: 0; /* Hapus margin pada tile terakhir di reel */
+        }
+
+        /* Animasi Berputar Cepat */
+        @keyframes fast-spin {
+            from { transform: translateY(0); }
+            to { transform: translateY(-33%); } /* Loop visual */
+        }
+
+        .spinning-fast {
+            animation: fast-spin 0.05s linear infinite;
+        }
+        
+        /* Efek Tumble */
+        .tumble-remove {
+            opacity: 0;
+            transform: scale(0.5);
+            transition: opacity 0.3s ease-in, transform 0.3s ease-in;
+        }
+        
+        .tumble-new {
+            animation: tumble-down 0.3s ease-out;
+        }
+        @keyframes tumble-down {
+            from { transform: translateY(-100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        /* Gaya Simbol Kustom (Sekarang khusus untuk menampung gambar) */
+        .symbol-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 6px;
+            font-weight: 900;
+            position: relative;
+        }
+
+        /* Gaya untuk semua gambar di dalam simbol (Full Size) */
+        .symbol-container img {
+            max-width: 100%;
+            max-height: 100%;
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover;
+            border-radius: 4px;
+            filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5));
+            image-rendering: optimizeQuality;
+        }
+        
+        /* Simbol WILD Teks (WILD) */
+        .symbol-gold { 
+            color: var(--gold-accent); 
+            background-color: var(--dark-red);
+            padding: 2px 5px;
+            border-radius: 4px;
+            font-size: 18px;
+            border: 2px solid var(--gold-accent);
+        }
+
+        /* Gaya untuk simbol Pengali BARU (X1, X2, X3, X5) */
+        .symbol-multiplier {
+            font-size: 24px;
+            font-weight: 900;
+            color: white;
+            padding: 5px;
+            border-radius: 6px;
+            min-width: 80%;
+            text-align: center;
+            box-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+            background: linear-gradient(to bottom right, #540b0e, #9b2226);
+            border: 2px solid var(--gold-accent);
+        }
+
+        /* Gaya untuk simbol SCATTER BARU */
+        .symbol-scatter {
+            background-color: #388e3c; /* Hijau Mahjong */
+            border-radius: 8px;
+            color: white;
+            font-size: 16px;
+            padding: 5px;
+            border: 2px solid #a5d6a7;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+        }
+        
+        /* Gaya Multiplier Display */
+        #multiplier-display {
+            background-color: #333;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 8px;
+            font-weight: 900;
+            border: 2px solid var(--gold-accent);
+            min-width: 80px;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        .multi-active {
+            background-color: var(--gold-accent) !important;
+            color: var(--dark-red) !important;
+            transform: scale(1.1);
+        }
+
+        /* GAYA IKON TOMBOL KONTROL */
+        .control-btn i {
+            /* Semua ikon + / - / bolt */
+            color: white !important; /* Ubah ikon menjadi Putih */
+            text-shadow: 0 0 5px var(--gold-accent); /* Tambahkan Bayangan Kuning Emas */
+        }
+        
+        #spin-btn i {
+            /* Ikon putaran utama */
+            color: var(--dark-red) !important; /* Ikon Putaran tetap Merah Gelap */
+            text-shadow: 0 0 3px #fff; /* Tambahkan Bayangan Putih untuk kontras pada latar belakang emas */
+        }
+
+        /* Gaya Tombol FREE/Iklan */
+        #free-reward-btn {
+            background: linear-gradient(to right, #00bfff, #007bff); /* Gradien Biru */
+            color: white;
+            font-weight: bold;
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 10px;
+            border: 2px solid #ffffff;
+            transition: all 0.2s;
+            box-shadow: 0 0 8px rgba(0, 191, 255, 0.8);
+            line-height: 1;
+            text-align: center;
+        }
+        #free-reward-btn:disabled {
+            background: #444;
+            border-color: #777;
+            box-shadow: none;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+    </style>
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+</head>
+<body class="bg-brown-bg">
+
+<div id="game-container">
+    
+    <!-- HEADER BAR --><div class="flex justify-between items-center text-white mb-2 relative z-10">
+        <!-- GROUP KIRI (Menu + Free Reward) -->
+        <div class="flex items-center space-x-2">
+            <button class="text-3xl p-2 rounded-full bg-dark-red border-2 border-gold-accent hover:opacity-80">
+                <i class="fas fa-bars control-btn-icon"></i>
+            </button>
+            <!-- TOMBOL FREE REWARD BARU -->
+            <button id="free-reward-btn" class="active:scale-95">
+                FREE <br> (<span id="ad-count">20</span>)
+            </button>
+        </div>
+
+        <!-- DISPLAY TENGAH (Title + Multiplier) -->
+        <div class="flex flex-col items-center">
+            <div class="text-xl font-black tracking-widest text-gold-accent" style="text-shadow: 1px 1px 3px var(--dark-red);">
+                2000 WAYS
+            </div>
+            <div id="multiplier-display" class="mt-1">
+                PENGALI X1
+            </div>
+        </div>
+        
+        <!-- DISPLAY KANAN (Placeholder untuk keseimbangan layout) -->
+        <div class="relative w-16 h-10">
+            <!-- FREE SPIN DISPLAY (tetap sebagai overlay) -->
+            <div id="free-spin-display" class="absolute -top-1 right-0 text-sm font-bold text-yellow-500 bg-red-800 p-1 px-2 rounded-lg border-2 border-yellow-500 hidden z-20">
+                FS: <span id="fs-count">0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- GAME GRID / REELS -->
+    <div id="game-grid">
+        <!-- Reel Columns and Reels will be injected here by JavaScript -->
+    </div>
+
+    <!-- MESSAGE BOX --><div class="z-10 flex justify-center items-center mb-3">
+        <div id="message-box" class="text-xs md:text-sm font-bold text-center text-gold-accent p-1 rounded" style="background-color: var(--dark-red); border: 1px solid var(--gold-accent); text-shadow: 1px 1px 2px #000;">
+            MAINKAN VOLATILITAS EKSTREM!
+        </div>
+    </div>
+
+    <!-- BALANCE / BET / WIN DISPLAY --><div class="flex justify-between items-end relative z-10 mb-3 text-white">
+        <!-- Balance --><div class="flex flex-col items-center p-1 bg-dark-red rounded-lg border-2 border-gold-accent w-1/3 mx-0.5 shadow-inner">
+            <span class="text-xs font-medium text-gold-accent">SALDO</span>
+            <span id="balance-display" class="font-black text-xl">1000</span>
+        </div>
+        <!-- Bet --><div class="flex flex-col items-center p-1 bg-dark-red rounded-lg border-2 border-gold-accent w-1/3 mx-0.5 shadow-inner">
+            <span class="text-xs font-medium text-gold-accent">TARUHAN</span>
+            <span id="bet-display" class="font-black text-xl">10</span>
+        </div>
+        <!-- Win --><div class="flex flex-col items-center p-1 bg-dark-red rounded-lg border-2 border-gold-accent w-1/3 mx-0.5 shadow-inner">
+            <span class="text-xs font-medium text-gold-accent">MENANG</span>
+            <span id="win-display" class="font-black text-xl text-yellow-300">0</span>
+        </div>
+    </div>
+
+    <!-- CONTROL BUTTONS -->
+    <div class="flex justify-around items-center relative z-10 pt-2">
+        <!-- Turbo/Lightning Button -->
+        <button id="turbo-btn" class="control-btn bg-dark-red p-3 rounded-full border-2 border-gold-accent text-gold-accent text-2xl hover:bg-red-900 active:scale-90 transition">
+            <i class="fas fa-bolt control-btn-icon"></i>
+        </button>
+        
+        <!-- Bet Minus Button -->
+        <button id="bet-minus-btn" class="control-btn bg-dark-red p-3 rounded-full border-2 border-gold-accent text-gold-accent text-2xl hover:bg-red-900 active:scale-90 transition">
+            <i class="fas fa-minus control-btn-icon"></i>
+        </button>
+
+        <!-- Main Spin Button -->
+        <button id="spin-btn" class="w-20 h-20 rounded-full bg-gold-accent flex justify-center items-center transform transition-transform duration-100 hover:scale-105 active:scale-95 shadow-2xl" style="border: 5px solid var(--red-primary); box-shadow: 0 0 20px var(--gold-accent);">
+            <i class="fas fa-redo-alt text-4xl text-dark-red"></i>
+        </button>
+        
+        <!-- Bet Plus Button -->
+        <button id="bet-plus-btn" class="control-btn bg-dark-red p-3 rounded-full border-2 border-gold-accent text-gold-accent text-2xl hover:bg-red-900 active:scale-90 transition">
+            <i class="fas fa-plus control-btn-icon"></i>
+        </button>
+    </div>
+
+</div>
+
+<script>
+    // Inisialisasi variabel global
+    const gameGrid = document.getElementById('game-grid');
+    const spinBtn = document.getElementById('spin-btn');
+    const balanceDisplay = document.getElementById('balance-display');
+    const betDisplay = document.getElementById('bet-display');
+    const winDisplay = document.getElementById('win-display');
+    const messageBox = document.getElementById('message-box');
+    const betMinusBtn = document.getElementById('bet-minus-btn');
+    const fsDisplay = document.getElementById('free-spin-display'); 
+    const fsCountSpan = document.getElementById('fs-count'); 
+    const multiplierDisplay = document.getElementById('multiplier-display');
+    const freeRewardBtn = document.getElementById('free-reward-btn');
+    const adCountSpan = document.getElementById('ad-count');
+
+    let balance = 1000; 
+    let bet = 10;     
+    let win = 0; 
+    let totalSpinWin = 0; 
+    let isSpinning = false;
+    let freeSpinCount = 0; 
+    let isInFreeSpin = false; 
+    let currentMultiplier = 1;
+    let tumbleCount = 0; 
+    
+    // VAR BARU UNTUK FREE REWARD
+    let adWatchCount = 0;
+    const MAX_ADS = 20;
+    const AD_REWARD = 50;
+    const AD_DURATION_MS = 30000; // 30 detik
+
+    const BET_STEP = 1; 
+    const MIN_BET = 10; 
+    const MAX_BET = 20; 
+    const MAX_MULTIPLIER_BASE = 5;
+    const MULTIPLIER_STEPS = [1, 2, 3, 5]; 
+
+    // Konstanta untuk Animasi Reel
+    const REEL_COUNT = 5;
+    const VISIBLE_TILES = 5;
+    const BUFFER_TILES = 10; 
+    const INITIAL_REEL_LENGTH = VISIBLE_TILES + BUFFER_TILES; 
+    const TILE_GAP = 5; 
+
+    // Variabel untuk menyimpan tinggi langkah 
+    let tileStepHeight = 0;
+    const SCATTER_SYMBOL_ID = 'scatter'; 
+    const WILD_ID = 'wild_ingot'; 
+    
+    // Definisikan Simbol Slot Kustom
+    const SYMBOLS = [
+        // 8 Simbol Bernilai Sangat Rendah (0.5x bet untuk 3-of-a-kind) - Index 0-7
+        { code: '<img src="https://placehold.co/40x40/FFD700/000000/png?text=A" alt="Tile A">', class: 'symbol-img', type: 'img', value: 0.5, symbolId: 'tile_a' },
+        { code: '<img src="https://placehold.co/40x40/FF0000/FFFFFF/png?text=B" alt="Tile B">', class: 'symbol-img', type: 'img', value: 0.5, symbolId: 'tile_b' },
+        { code: '<img src="https://placehold.co/40x40/0000FF/FFFFFF/png?text=C" alt="Tile C">', class: 'symbol-img', type: 'img', value: 0.5, symbolId: 'tile_c' },
+        { code: '<img src="https://placehold.co/40x40/008000/FFFFFF/png?text=D" alt="Tile D">', class: 'symbol-img', type: 'img', value: 0.5, symbolId: 'tile_d' },
+        { code: '<img src="https://placehold.co/40x40/FFA500/000000/png?text=E" alt="Tile E">', class: 'symbol-img', type: 'img', value: 1, symbolId: 'tile_e' }, 
+        { code: '<img src="https://placehold.co/40x40/800080/FFFFFF/png?text=F" alt="Tile F">', class: 'symbol-img', type: 'img', value: 1, symbolId: 'tile_f' }, 
+        { code: '<img src="https://placehold.co/40x40/40E0D0/000000/png?text=G" alt="Tile G">', class: 'symbol-img', type: 'img', value: 2, symbolId: 'tile_g' }, 
+        { code: '<img src="https://placehold.co/40x40/212121/FFFFFF/png?text=H" alt="Tile H">', class: 'symbol-img', type: 'img', value: 3, symbolId: 'tile_h' }, 
+
+        // WILD (Pengganti) - Index 8
+        { code: '<img src="https://placehold.co/40x40/FFC300/660708/png?text=WILD" alt="Wild Ingot">', class: 'symbol-img', type: 'img', value: 50, symbolId: WILD_ID },
+        
+        // Simbol Pengali (Nilai Tinggi) - Index 9-12
+        { code: 'X1', class: 'symbol-multiplier x1', type: 'text', value: 10, symbolId: 'mult_x1' },
+        { code: 'X2', class: 'symbol-multiplier x2', type: 'text', value: 20, symbolId: 'mult_x2' },
+        { code: 'X3', class: 'symbol-multiplier x3', type: 'text', value: 30, symbolId: 'mult_x3' },
+        { code: 'X5', class: 'symbol-multiplier x5', type: 'text', value: 50, symbolId: 'mult_x5' },
+        
+        // SCATTER (Bonus) - Index 13
+        { code: 'SCATTER', class: 'symbol-container symbol-scatter', type: 'text', value: 0, symbolId: SCATTER_SYMBOL_ID } 
+    ];
+
+    // Map simbol untuk pencarian cepat
+    const SYMBOL_MAP = {};
+    SYMBOLS.forEach(s => SYMBOL_MAP[s.symbolId] = s);
+    
+    // --- FUNGSI UI & UTILITAS ---
+
+    function updateDisplay() {
+        balanceDisplay.textContent = balance.toFixed(0);
+        betDisplay.textContent = bet.toFixed(0);
+        winDisplay.textContent = totalSpinWin.toFixed(0); 
+        multiplierDisplay.textContent = `PENGALI X${currentMultiplier}`;
+        adCountSpan.textContent = MAX_ADS - adWatchCount;
+
+        if (currentMultiplier > 1) {
+            multiplierDisplay.classList.add('multi-active');
+        } else {
+            multiplierDisplay.classList.remove('multi-active');
+        }
+
+        // LOGIKA TAMPILAN FREE SPIN
+        const isControlDisabled = isSpinning || isInFreeSpin;
+        
+        if (isInFreeSpin) {
+            fsDisplay.classList.remove('hidden');
+            fsCountSpan.textContent = freeSpinCount.toFixed(0);
+            spinBtn.style.backgroundColor = 'var(--red-primary)'; 
+            spinBtn.style.boxShadow = '0 0 20px var(--red-primary)';
+        } else {
+            fsDisplay.classList.add('hidden');
+            spinBtn.style.backgroundColor = 'var(--gold-accent)'; 
+            spinBtn.style.boxShadow = '0 0 20px var(--gold-accent)';
+        }
+        
+        // Disable tombol BET dan FREE REWARD saat berputar atau FS
+        betMinusBtn.disabled = isControlDisabled;
+        document.getElementById('bet-plus-btn').disabled = isControlDisabled;
+        freeRewardBtn.disabled = isControlDisabled || adWatchCount >= MAX_ADS;
+    }
+
+    function createTile(symbol) {
+        const tile = document.createElement('div');
+        tile.className = 'tile tumble-new';
+        // Atur agar animasi tumble-new hanya berjalan sekali
+        setTimeout(() => tile.classList.remove('tumble-new'), 300); 
+
+        tile.innerHTML = `<span class="symbol-container ${symbol.class}">${symbol.code}</span>`;
+        tile.dataset.symbolId = symbol.symbolId; 
+        tile.dataset.value = symbol.value;
+        return tile;
+    }
+
+    /**
+     * MENGAMBIL SIMBOL ACAK DENGAN DISTRIBUSI VOLATILITAS EKSTREM TINGGI
+     * Disesuaikan agar kemenangan sangat jarang (low hit frequency).
+     */
+    function getRandomSymbol() {
+        const rand = Math.random();
+        
+        // Rentang Simbol Rendah: Index 0 sampai 7 (70% Chance)
+        const LOW_PAY_SYMBOLS = SYMBOLS.slice(0, 8); 
+        // Rentang Simbol Tinggi: Index 8 ke atas
+        const HIGH_IMPACT_SYMBOLS = SYMBOLS.slice(8); 
+
+        if (rand < 0.70) { 
+            // 70% peluang simbol reguler rendah (terdistribusi di 8 simbol unik)
+            const index = Math.floor(Math.random() * LOW_PAY_SYMBOLS.length);
+            return LOW_PAY_SYMBOLS[index]; 
+        } else if (rand < 0.70 + 0.02) { 
+            // 2% peluang WILD (Index 8) - SANGAT JARANG!
+            return HIGH_IMPACT_SYMBOLS[0]; 
+        } else if (rand < 0.70 + 0.02 + 0.25) { 
+            // 25% peluang Multiplier (Index 9 hingga 12) - Simbol "Mati" untuk Ways Win
+            const index = 1 + Math.floor(Math.random() * 4); // Index 1 (X1) hingga 4 (X5)
+            return HIGH_IMPACT_SYMBOLS[index]; 
+        } else { 
+            // 3% peluang SCATTER (Index 13) - JARANG!
+            return HIGH_IMPACT_SYMBOLS[5]; 
+        }
+    }
+
+    // Menggambar grid awal
+    function drawGrid() {
+        gameGrid.innerHTML = '';
+        
+        for (let r = 0; r < REEL_COUNT; r++) {
+            const reelContainer = document.createElement('div');
+            reelContainer.className = 'reel-column';
+            
+            const reel = document.createElement('div');
+            reel.className = 'reel';
+            reel.id = `reel-${r}`;
+            
+            for (let i = 0; i < INITIAL_REEL_LENGTH; i++) {
+                reel.appendChild(createTile(getRandomSymbol()));
+            }
+            
+            reelContainer.appendChild(reel);
+            gameGrid.appendChild(reelContainer);
+        }
+        
+        const tempTile = document.getElementById('reel-0')?.querySelector('.tile');
+        if (tempTile) {
+            tileStepHeight = tempTile.offsetHeight + TILE_GAP; 
+            
+            for (let r = 0; r < REEL_COUNT; r++) {
+                const reel = document.getElementById(`reel-${r}`);
+                if (reel) {
+                    const initialOffset = BUFFER_TILES * tileStepHeight; 
+                    reel.style.transform = `translateY(-${initialOffset}px)`;
+                }
+            }
+        }
+        
+        updateDisplay();
+    }
+
+    // --- FUNGSI KONTROL PUTARAN ---
+
+    function startSpin() {
+        if (isSpinning || (!isInFreeSpin && balance < bet)) {
+            if (balance < bet) {
+                messageBox.textContent = 'SALDO TIDAK CUKUP!';
+                setTimeout(() => messageBox.textContent = 'MAINKAN VOLATILITAS EKSTREM!', 2000);
+            }
+            return;
+        }
+
+        isSpinning = true;
+        totalSpinWin = 0; 
+        currentMultiplier = 1; // RESET Multiplier di awal spin
+        tumbleCount = 0;
+
+        if (!isInFreeSpin) {
+            balance -= bet; 
+            messageBox.textContent = 'BERPUTAR...';
+        } else {
+            freeSpinCount--; 
+            messageBox.textContent = `FREE SPIN! Sisa: ${freeSpinCount}. (Pengali X${currentMultiplier})`;
+        }
+
+        updateDisplay();
+
+        const reels = document.querySelectorAll('.reel');
+        const finalSymbols = []; 
+
+        reels.forEach((_, r) => {
+            finalSymbols[r] = [];
+            for(let i=0; i < VISIBLE_TILES; i++) {
+                // Menggunakan distribusi baru untuk hasil akhir
+                finalSymbols[r].push(getRandomSymbol());
+            }
+        });
+        
+        reels.forEach(reel => {
+            reel.style.transition = 'none';
+            reel.classList.add('spinning-fast');
+            const spinStartOffset = (BUFFER_TILES * 2) * tileStepHeight; 
+            reel.style.transform = `translateY(-${spinStartOffset}px)`;
+        });
+
+        stopReels(finalSymbols);
+    }
+
+    function stopReels(finalSymbols) {
+        const reels = document.querySelectorAll('.reel');
+        
+        reels.forEach((reel, r) => {
+            setTimeout(() => {
+                reel.classList.remove('spinning-fast');
+                
+                let stopTilesContent = [];
+                for (let i = 0; i < BUFFER_TILES; i++) {
+                    stopTilesContent.push(getRandomSymbol());
+                }
+                stopTilesContent = stopTilesContent.concat(finalSymbols[r]); 
+                
+                reel.innerHTML = '';
+                stopTilesContent.forEach(symbol => reel.appendChild(createTile(symbol)));
+                
+                const tilesToHideAbove = BUFFER_TILES; 
+                const finalStopOffset = tilesToHideAbove * tileStepHeight; 
+                const overshootOffset = finalStopOffset - (tileStepHeight * 0.5); 
+                
+                reel.style.transition = 'transform 0.5s cubic-bezier(0.1, 0.7, 0.4, 1.0)'; 
+                reel.style.transform = `translateY(-${overshootOffset}px)`;
+                
+                setTimeout(() => {
+                    reel.style.transition = 'transform 0.1s ease-out'; 
+                    reel.style.transform = `translateY(-${finalStopOffset}px)`;
+                }, 500);
+
+                if (r === REEL_COUNT - 1) {
+                    setTimeout(() => processSpinResult(), 650); 
+                }
+
+            }, r * 200 + 500); 
+        });
+    }
+
+    // --- FUNGSI WAYS DAN TUMBLE ---
+
+    /**
+     * Mengambil keadaan grid simbol yang terlihat (5x5) dari DOM.
+     * @returns {Array<Array<{symbolId: string, value: number, element: HTMLElement}>>} grid[column][row] (bottom to top)
+     */
+    function getVisibleGridState() {
+        const grid = [];
+        document.querySelectorAll('.reel-column').forEach((col, c) => {
+            const reelSymbols = [];
+            const allTiles = col.querySelectorAll('.tile');
+            
+            for (let r = 0; r < VISIBLE_TILES; r++) {
+                const tileIndex = allTiles.length - VISIBLE_TILES + r;
+                const tile = allTiles[tileIndex];
+                if (tile) {
+                    reelSymbols.push({
+                        symbolId: tile.dataset.symbolId,
+                        value: parseFloat(tile.dataset.value),
+                        element: tile, 
+                        isWinning: false 
+                    });
+                }
+            }
+            grid.push(reelSymbols);
+        });
+        return grid; 
+    }
+
+    /**
+     * Menghitung kemenangan Ways dan mengidentifikasi tile pemenang.
+     * @param {Array<Array<object>>} currentGrid - Grid 5x5 saat ini.
+     * @returns {{totalWin: number, winningTiles: Array<object>}}
+     */
+    function calculateWaysWin(currentGrid) {
+        let totalWin = 0;
+        const winningTiles = [];
+        // Simbol yang dapat menghasilkan ways win (semua kecuali SCATTER dan MULTIPLIER)
+        const PAYABLE_SYMBOLS = SYMBOLS.filter(s => 
+            s.symbolId !== SCATTER_SYMBOL_ID && 
+            !s.symbolId.startsWith('mult_')
+        );
+
+        const winningTileSet = new Set(); 
+
+        PAYABLE_SYMBOLS.forEach(baseSymbol => {
+            const baseId = baseSymbol.symbolId;
+            const baseValue = baseSymbol.value;
+
+            const reelMatches = Array(REEL_COUNT).fill(0);
+            const reelWinningElements = Array(REEL_COUNT).fill(null).map(() => []);
+
+            for (let c = 0; c < REEL_COUNT; c++) {
+                currentGrid[c].forEach(tile => {
+                    // Tile dianggap cocok jika ID-nya sama ATAU itu adalah WILD
+                    if (tile.symbolId === baseId || tile.symbolId === WILD_ID) {
+                        reelMatches[c]++;
+                        reelWinningElements[c].push(tile);
+                    }
+                });
+            }
+
+            let consecutiveReels = 0;
+            let waysMultiplier = 1;
+
+            for (let c = 0; c < REEL_COUNT; c++) {
+                if (reelMatches[c] > 0) {
+                    consecutiveReels++;
+                    waysMultiplier *= reelMatches[c];
+                } else {
+                    break; 
+                }
+            }
+
+            if (consecutiveReels >= 3) {
+                let payoutBetMultiplier = 0;
+                // Nilai Payout (tetap sama)
+                if (consecutiveReels === 3) payoutBetMultiplier = 1;
+                else if (consecutiveReels === 4) payoutBetMultiplier = 3;
+                else if (consecutiveReels === 5) payoutBetMultiplier = 10;
+                
+                // Hitung jumlah kemenangan sebelum pengali putaran
+                const winAmount = baseValue * waysMultiplier * payoutBetMultiplier * bet / 10;
+                totalWin += winAmount;
+
+                // Tandai tile pemenang (hanya reel yang berpartisipasi dalam kemenangan 3+ ways)
+                for (let c = 0; c < consecutiveReels; c++) {
+                    reelWinningElements[c].forEach(tile => {
+                        // Gunakan referensi elemen DOM untuk identifikasi unik
+                        if (!winningTileSet.has(tile.element)) {
+                            winningTiles.push(tile.element);
+                            winningTileSet.add(tile.element);
+                        }
+                    });
+                }
+            }
+        });
+
+        return { totalWin: Math.round(totalWin), winningTiles: winningTiles };
+    }
+
+
+    /**
+     * Proses hasil putaran: Cek Win, Aplikasikan Multiplier, Tumble atau End Spin.
+     */
+    function processSpinResult() {
+        const currentGridState = getVisibleGridState();
+        const { totalWin: currentWin, winningTiles } = calculateWaysWin(currentGridState);
+        
+        let scatterCount = 0;
+        if (tumbleCount === 0) { // Hanya cek scatter di putaran awal (Tumble 0)
+            scatterCount = checkScatter(currentGridState);
+            handleScatterTrigger(scatterCount);
+        }
+
+        if (currentWin > 0) {
+            tumbleCount++; 
+            
+            // 1. Tentukan Multiplier saat ini (Base: x1, x2, x3, x5)
+            const multiplierIndex = Math.min(tumbleCount - 1, MULTIPLIER_STEPS.length - 1);
+            currentMultiplier = MULTIPLIER_STEPS[multiplierIndex];
+
+            // 2. Aplikasikan Multiplier ke kemenangan
+            const finalWin = currentWin * currentMultiplier;
+            balance += finalWin;
+            totalSpinWin += finalWin;
+
+            // UBAH PESAN: Perhatikan jika kemenangan < bet
+            if (finalWin < bet) {
+                messageBox.textContent = `MENANG KECIL X${currentMultiplier} senilai ${finalWin}. Runtuhan #${tumbleCount}!`;
+            } else {
+                messageBox.textContent = `MENANG X${currentMultiplier} senilai ${finalWin}! Runtuhan #${tumbleCount}!`;
+            }
+            updateDisplay();
+
+            // 3. Tumble/Runtuhan: Hapus pemenang dan isi ulang
+            handleTumble(winningTiles);
+
+        } else {
+            // TIDAK ADA KEMENANGAN ATAU CASCADING SELESAI
+            messageBox.textContent = `Putaran Selesai. Total Menang: ${totalSpinWin}`;
+            
+            if (isInFreeSpin && freeSpinCount <= 0) {
+                isInFreeSpin = false;
+                freeSpinCount = 0;
+                messageBox.textContent = 'FREE SPIN SELESAI. Kembali ke game normal.';
+            } else if (!isInFreeSpin && totalSpinWin === 0) {
+                // Konfirmasi: Sering kalah/Win = 0, sesuai volatilitas tinggi
+                messageBox.textContent = 'TIDAK ADA KEMENANGAN. COBA LAGI!';
+            }
+
+            isSpinning = false;
+            updateDisplay();
+        }
+    }
+    
+    /**
+     * Menghapus tile pemenang dan mengisi ulang grid (Tumble).
+     * @param {Array<HTMLElement>} winningTiles - Elemen DOM yang harus dihapus.
+     */
+    function handleTumble(winningTiles) {
+        if (winningTiles.length === 0) return;
+
+        isSpinning = true; 
+
+        // 1. Animasi Penghapusan/Highlight
+        winningTiles.forEach(tile => {
+            tile.classList.add('tumble-remove');
+        });
+        
+        // Timeout untuk animasi penghapusan
+        setTimeout(() => {
+            const reels = document.querySelectorAll('.reel');
+
+            reels.forEach((reel, c) => {
+                const visibleTiles = Array.from(reel.querySelectorAll('.tile:not(.tumble-remove)'));
+                
+                // 2. Hitung slot kosong
+                const removedCount = VISIBLE_TILES - visibleTiles.length;
+                
+                // 3. Tambahkan simbol baru di bagian atas reel
+                for (let i = 0; i < removedCount; i++) {
+                    const newSymbol = createTile(getRandomSymbol());
+                    reel.insertBefore(newSymbol, reel.firstElementChild); // Masukkan di paling atas
+                }
+                
+                // 4. Hapus tile pemenang yang lama (setelah animasi)
+                reel.querySelectorAll('.tumble-remove').forEach(tile => tile.remove());
+                
+                // 5. Geser Reel ke Posisi Stop (Simulasi Tumble ke bawah)
+                const newStopOffset = (BUFFER_TILES + removedCount) * tileStepHeight;
+
+                reel.style.transition = 'transform 0s'; 
+                reel.style.transform = `translateY(-${newStopOffset}px)`;
+                
+                // 6. Animasi Tumble ke Posisi View (Simulasi jatuh)
+                setTimeout(() => {
+                    const finalStopOffset = BUFFER_TILES * tileStepHeight; 
+                    reel.style.transition = 'transform 0.3s ease-out';
+                    reel.style.transform = `translateY(-${finalStopOffset}px)`;
+                }, 50); 
+            });
+
+            // 7. Setelah animasi jatuh selesai, cek kemenangan lagi
+            setTimeout(processSpinResult, 400); 
+            
+        }, 350); // Delay untuk melihat animasi remove
+    }
+
+    // Fungsi menghitung Scatter (tetap sama)
+    function checkScatter(currentGridState) {
+        let scatterCount = 0;
+        currentGridState.forEach(reelSymbols => {
+            reelSymbols.forEach(symbol => {
+                if (symbol.symbolId === SCATTER_SYMBOL_ID) {
+                    scatterCount++;
+                }
+            });
+        });
+        return scatterCount;
+    }
+
+    function handleScatterTrigger(scatterCount) {
+        let freeSpinsAwarded = 0;
+
+        if (scatterCount >= 4) {
+            freeSpinsAwarded = 12; 
+        } else if (scatterCount >= 3) {
+            if (isInFreeSpin) {
+                freeSpinsAwarded = 3; 
+            } else {
+                freeSpinsAwarded = 10; 
+            }
+        }
+        
+        if (freeSpinsAwarded > 0) {
+            if (!isInFreeSpin) {
+                isInFreeSpin = true;
+                messageBox.textContent = `!!! BONUS !!! ${freeSpinsAwarded} FREE SPIN DIMENANGKAN!`;
+            } else {
+                messageBox.textContent = `RE-TRIGGER! +${freeSpinsAwarded} FREE SPIN DITAMBAH!`;
+            }
+            freeSpinCount += freeSpinsAwarded;
+            
+            // Berikan kemenangan ekstra untuk pemicu FS
+            if (totalSpinWin === 0) {
+                balance += bet * 10;
+                totalSpinWin += bet * 10;
+            }
+        }
+    }
+
+    // --- FUNGSI FREE REWARD (IKLAN) ---
+    function watchAdForReward() {
+        if (adWatchCount >= MAX_ADS) {
+            messageBox.textContent = 'ANDA SUDAH MENCAPAI BATAS HARIAN 20 KALI!';
+            return;
+        }
+
+        // Simulasikan Iklan Sedang Ditampilkan
+        messageBox.textContent = `MENONTON IKLAN... (${(AD_DURATION_MS / 1000).toFixed(0)} detik)`;
+        freeRewardBtn.disabled = true; // Nonaktifkan tombol saat simulasi
+        
+        // Timer Simulasi Iklan
+        let timer = AD_DURATION_MS / 1000;
+        const interval = setInterval(() => {
+            timer--;
+            messageBox.textContent = `IKLAN TERSISA... (${timer} detik)`;
+            if (timer <= 0) {
+                clearInterval(interval);
+                
+                // Logika Pemberian Hadiah
+                adWatchCount++;
+                balance += AD_REWARD;
+                
+                messageBox.textContent = `SELAMAT! Anda mendapatkan RP${AD_REWARD} saldo gratis!`;
+                updateDisplay(); 
+
+                // Aktifkan kembali tombol setelah jeda singkat
+                setTimeout(() => {
+                    messageBox.textContent = 'MAINKAN VOLATILITAS EKSTREM!';
+                    updateDisplay(); // Panggil lagi untuk memastikan tombol diaktifkan/dinonaktifkan sesuai batas
+                }, 2000);
+            }
+        }, 1000);
+    }
+
+
+    // --- EVENT LISTENERS ---
+
+    spinBtn.addEventListener('click', startSpin);
+    freeRewardBtn.addEventListener('click', watchAdForReward); // Listener baru
+    
+    document.getElementById('turbo-btn').addEventListener('click', () => {
+        messageBox.textContent = 'MODE TURBO AKTIF!';
+        setTimeout(() => messageBox.textContent = isInFreeSpin ? 'MODE FREE SPIN AKTIF' : 'MAINKAN VOLATILITAS EKSTREM!', 1500);
+    });
+    
+    // Tombol Bet Minus
+    betMinusBtn.addEventListener('click', () => {
+        if(isSpinning || isInFreeSpin) return;
+        bet = Math.max(bet - BET_STEP, MIN_BET);
+        updateDisplay();
+        messageBox.textContent = `TARUHAN DIKURANGI: ${bet.toFixed(0)}`; 
+        setTimeout(() => messageBox.textContent = 'MAINKAN VOLATILITAS EKSTREM!', 1500);
+    });
+    
+    // Tombol Bet Plus
+    document.getElementById('bet-plus-btn').addEventListener('click', () => {
+        if(isSpinning || isInFreeSpin) return;
+        bet = Math.min(bet + BET_STEP, MAX_BET);
+        updateDisplay();
+        messageBox.textContent = `TARUHAN DITAMBAH: ${bet.toFixed(0)}`; 
+        setTimeout(() => messageBox.textContent = 'MAINKAN VOLATILITAS EKSTREM!', 1500);
+    });
+
+    // Inisialisasi Game
+    window.onload = drawGrid;
+    window.onresize = drawGrid; 
+</script>
+
+</body>
+</html>
