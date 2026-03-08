@@ -17,6 +17,7 @@ import {
 import { useRouter } from 'expo-router';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
+import { makeRedirectUri } from 'expo-auth-session';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { registerUser, loginUser, loginWithGoogle, completeGoogleProfile } from '@/lib/api';
@@ -95,19 +96,45 @@ export default function AuthScreen() {
   const [cpLoading, setCpLoading] = useState(false);
   const [showCpEwalletPicker, setShowCpEwalletPicker] = useState(false);
 
-  // Google Auth
+  // Google Auth — use webClientId only (works for Expo Go + EAS builds)
+  const redirectUri = makeRedirectUri({ scheme: 'cuanterus' });
   const [_request, response, promptAsync] = Google.useAuthRequest({
     webClientId: GOOGLE_WEB_CLIENT_ID,
-    androidClientId: GOOGLE_WEB_CLIENT_ID,
+    // Don't set androidClientId to webClientId — let expo-auth-session handle it
+    // expoClientId is for Expo Go proxy
+    expoClientId: GOOGLE_WEB_CLIENT_ID,
+    redirectUri,
+    scopes: ['openid', 'profile', 'email'],
   });
 
   // Handle Google response
   React.useEffect(() => {
-    if (response?.type === 'success') {
-      const { id_token } = response.params;
-      handleGoogleLogin(id_token);
-    } else if (response?.type === 'error') {
+    if (!response) return;
+
+    if (response.type === 'success') {
+      // Extract id_token from either authentication or params
+      const idToken =
+        response.authentication?.idToken ||
+        response.params?.id_token ||
+        null;
+
+      if (idToken) {
+        handleGoogleLogin(idToken);
+      } else {
+        // Fallback: try to exchange access token
+        const accessToken = response.authentication?.accessToken || response.params?.access_token;
+        if (accessToken) {
+          handleGoogleLoginWithAccessToken(accessToken);
+        } else {
+          Alert.alert('Gagal', 'Tidak bisa mendapatkan token dari Google. Coba lagi.');
+          setGoogleLoading(false);
+        }
+      }
+    } else if (response.type === 'error') {
+      console.error('[Auth] Google error:', response.error);
       Alert.alert('Gagal', 'Login Google gagal. Coba lagi.');
+      setGoogleLoading(false);
+    } else if (response.type === 'dismiss') {
       setGoogleLoading(false);
     }
   }, [response]);
@@ -119,21 +146,122 @@ export default function AuthScreen() {
       const result = await loginWithGoogle(idToken);
       const user = auth.currentUser;
 
+      if (!user) {
+        throw new Error('Gagal mendapatkan data pengguna.');
+      }
+
       // Admin langsung masuk
-      if (user?.email && isAdminEmail(user.email)) {
+      if (user.email && isAdminEmail(user.email)) {
         router.replace('/admin');
         return;
       }
 
       // User biasa — cek profil lengkap
       if (result.needsProfile) {
-        // Pre-fill nama dari Google
-        setCpName(user?.displayName || '');
+        // Pre-fill dari Google profile
+        setCpName(user.displayName || '');
+        setCpPhone('');
         setShowCompleteProfile(true);
       } else {
         router.replace('/(tabs)');
       }
     } catch (e: any) {
+      console.error('[Auth] Google login error:', e);
+      let msg = 'Login Google gagal.';
+      if (e.code === 'auth/account-exists-with-different-credential') {
+        msg = 'Email ini sudah terdaftar dengan metode login lain. Gunakan nomor ponsel.';
+      } else if (e.code === 'auth/invalid-credential') {
+        msg = 'Token Google tidak valid. Coba lagi.';
+      } else if (e.code === 'auth/network-request-failed') {
+        msg = 'Tidak ada koneksi internet.';
+      } else if (e.message) {
+        msg = e.message;
+      }
+      Alert.alert('Gagal', msg);
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  // Fallback: login with access token (when id_token not available)
+  const handleGoogleLoginWithAccessToken = async (accessToken: string) => {
+    setGoogleLoading(true);
+    try {
+      // Fetch user info from Google API
+      const res = await fetch('https://www.googleapis.com/userinfo/v2/me', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const userInfo = await res.json();
+
+      if (!userInfo.email) {
+        throw new Error('Tidak bisa mendapatkan email dari Google.');
+      }
+
+      // Try to get id_token from tokeninfo endpoint
+      const tokenRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?access_token=${accessToken}`);
+      const tokenInfo = await tokenRes.json();
+
+      if (tokenInfo.error) {
+        throw new Error('Token Google tidak valid.');
+      }
+
+      // Use the access token to create a Google credential
+      // GoogleAuthProvider.credential can accept (idToken, accessToken) or just (idToken)
+      // With only accessToken, we use it differently
+      const { GoogleAuthProvider, signInWithCredential } = await import('firebase/auth');
+      const credential = GoogleAuthProvider.credential(null, accessToken);
+      const result = await signInWithCredential(auth, credential);
+      const user = result.user;
+
+      // Check/create Firestore profile
+      const { doc: docRef, getDoc: getDocSnap, setDoc: setDocRef } = await import('firebase/firestore');
+      const userRef = docRef(db, USERS_PATH, user.uid);
+      const snap = await getDocSnap(userRef);
+
+      if (!snap.exists()) {
+        const refCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const now = new Date();
+        await setDocRef(userRef, {
+          uid: user.uid,
+          email: user.email || '',
+          name: user.displayName || userInfo.name || '',
+          phone: '',
+          balance: 0,
+          totalEarned: 0,
+          lastCheckin: '',
+          streak: 0,
+          myReferralCode: refCode,
+          usedReferral: '',
+          referralCount: 0,
+          joinedAt: now.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
+          createdAt: now.toISOString(),
+          adsToday: 0,
+          lastAdDate: '',
+          spinsToday: 0,
+          lastSpinDate: '',
+          blocked: false,
+          ewalletId: '',
+          ewalletName: '',
+          ewalletOwner: '',
+          ewalletNumber: '',
+          loginMethod: 'google',
+          profileComplete: false,
+        });
+        setCpName(user.displayName || userInfo.name || '');
+        setShowCompleteProfile(true);
+      } else {
+        const data = snap.data();
+        if (!data.profileComplete && data.loginMethod === 'google') {
+          setCpName(data.name || user.displayName || '');
+          setShowCompleteProfile(true);
+        } else if (user.email && isAdminEmail(user.email)) {
+          router.replace('/admin');
+        } else {
+          router.replace('/(tabs)');
+        }
+      }
+    } catch (e: any) {
+      console.error('[Auth] Google access token login error:', e);
       Alert.alert('Gagal', e.message || 'Login Google gagal.');
     } finally {
       setGoogleLoading(false);
@@ -532,8 +660,19 @@ export default function AuthScreen() {
 
             {/* Google Sign In */}
             <TouchableOpacity
-              style={styles.googleBtn}
-              onPress={() => { setGoogleLoading(true); promptAsync(); }}
+              style={[styles.googleBtn, !_request && { opacity: 0.5 }]}
+              onPress={() => {
+                if (!_request) {
+                  Alert.alert('Tidak Tersedia', 'Google Sign-In belum siap. Coba lagi dalam beberapa detik.');
+                  return;
+                }
+                setGoogleLoading(true);
+                promptAsync({ showInRecents: true }).catch((e) => {
+                  console.error('[Auth] promptAsync error:', e);
+                  setGoogleLoading(false);
+                  Alert.alert('Gagal', 'Tidak bisa membuka Google Sign-In.');
+                });
+              }}
               disabled={googleLoading}
               activeOpacity={0.7}
             >
@@ -594,8 +733,19 @@ export default function AuthScreen() {
 
             {/* Google Sign In */}
             <TouchableOpacity
-              style={styles.googleBtn}
-              onPress={() => { setGoogleLoading(true); promptAsync(); }}
+              style={[styles.googleBtn, !_request && { opacity: 0.5 }]}
+              onPress={() => {
+                if (!_request) {
+                  Alert.alert('Tidak Tersedia', 'Google Sign-In belum siap. Coba lagi dalam beberapa detik.');
+                  return;
+                }
+                setGoogleLoading(true);
+                promptAsync({ showInRecents: true }).catch((e) => {
+                  console.error('[Auth] promptAsync error:', e);
+                  setGoogleLoading(false);
+                  Alert.alert('Gagal', 'Tidak bisa membuka Google Sign-In.');
+                });
+              }}
               disabled={googleLoading}
               activeOpacity={0.7}
             >

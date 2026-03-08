@@ -195,24 +195,64 @@ export async function loginWithGoogle(idToken: string): Promise<{
   const snap = await getDoc(userRef);
 
   if (!snap.exists()) {
-    // User baru via Google — buat dokumen dasar
+    // User baru via Google — buat dokumen lengkap (sama seperti register biasa)
+    const refCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const now = new Date();
+    const joinDate = now.toLocaleDateString('id-ID', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+
     await setDoc(userRef, {
+      uid: user.uid,
       email: user.email || '',
       name: user.displayName || '',
       phone: '',
       balance: 0,
       totalEarned: 0,
-      referralCode: user.uid.slice(0, 8).toUpperCase(),
-      referredBy: '',
+      lastCheckin: '',
+      streak: 0,
+      myReferralCode: refCode,
+      usedReferral: '',
+      referralCount: 0,
+      joinedAt: joinDate,
+      createdAt: now.toISOString(),
+      adsToday: 0,
+      lastAdDate: '',
+      spinsToday: 0,
+      lastSpinDate: '',
+      blocked: false,
+      ewalletId: '',
+      ewalletName: '',
+      ewalletOwner: '',
+      ewalletNumber: '',
       loginMethod: 'google',
       profileComplete: false,
-      blocked: false,
-      createdAt: serverTimestamp(),
     });
+
+    await logTransaction(user.uid, 'register', 0, 'Akun baru (Google Sign-In)');
     return { isNewUser: true, needsProfile: true };
   }
 
   const data = snap.data();
+
+  // Jika dokumen lama (dari versi sebelumnya) tidak punya field lengkap, patch-nya
+  const missingFields: Record<string, any> = {};
+  if (!data.uid) missingFields.uid = user.uid;
+  if (!data.myReferralCode && !data.referralCode) {
+    missingFields.myReferralCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+  }
+  if (data.lastCheckin === undefined) missingFields.lastCheckin = '';
+  if (data.streak === undefined) missingFields.streak = 0;
+  if (data.adsToday === undefined) missingFields.adsToday = 0;
+  if (data.spinsToday === undefined) missingFields.spinsToday = 0;
+  if (data.referralCount === undefined) missingFields.referralCount = 0;
+
+  if (Object.keys(missingFields).length > 0) {
+    await updateDoc(userRef, missingFields);
+  }
+
   // User lama tapi profil belum lengkap
   if (!data.profileComplete && data.loginMethod === 'google') {
     return { isNewUser: false, needsProfile: true };
@@ -224,7 +264,7 @@ export async function loginWithGoogle(idToken: string): Promise<{
 /** Lengkapi profil user Google */
 export async function completeGoogleProfile(
   uid: string,
-  data: {
+  profileData: {
     name: string;
     phone: string;
     ewalletId: string;
@@ -234,15 +274,40 @@ export async function completeGoogleProfile(
   }
 ): Promise<void> {
   const userRef = doc(db, USERS_PATH, uid);
-  await updateDoc(userRef, {
-    name: data.name,
-    phone: data.phone,
-    ewalletId: data.ewalletId,
-    ewalletName: data.ewalletName,
-    ewalletOwner: data.ewalletOwner,
-    ewalletNumber: data.ewalletNumber,
+  const snap = await getDoc(userRef);
+  const existing = snap.exists() ? snap.data() : {};
+
+  // Ensure all required fields exist
+  const updates: Record<string, any> = {
+    name: profileData.name,
+    phone: profileData.phone,
+    ewalletId: profileData.ewalletId,
+    ewalletName: profileData.ewalletName,
+    ewalletOwner: profileData.ewalletOwner,
+    ewalletNumber: profileData.ewalletNumber,
     profileComplete: true,
-  });
+  };
+
+  // Patch missing fields from incomplete Google registration
+  if (!existing.uid) updates.uid = uid;
+  if (!existing.myReferralCode && !existing.referralCode) {
+    updates.myReferralCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+  }
+  if (!existing.joinedAt) {
+    updates.joinedAt = new Date().toLocaleDateString('id-ID', {
+      day: 'numeric', month: 'long', year: 'numeric',
+    });
+  }
+  if (existing.lastCheckin === undefined) updates.lastCheckin = '';
+  if (existing.streak === undefined) updates.streak = 0;
+  if (existing.usedReferral === undefined) updates.usedReferral = '';
+  if (existing.referralCount === undefined) updates.referralCount = 0;
+  if (existing.adsToday === undefined) updates.adsToday = 0;
+  if (existing.lastAdDate === undefined) updates.lastAdDate = '';
+  if (existing.spinsToday === undefined) updates.spinsToday = 0;
+  if (existing.lastSpinDate === undefined) updates.lastSpinDate = '';
+
+  await updateDoc(userRef, updates);
 }
 
 export async function logoutUser() {
