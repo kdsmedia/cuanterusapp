@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mahjong Ways 2 Slot</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap');
+
+        body {
+            background-color: #020617;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            max-width: 480px;
+            height: 95vh;
+            background: linear-gradient(to bottom, #1e1b4b, #020617);
+            border: 3px solid #f59e0b;
+            border-radius: 24px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 0 40px rgba(245, 158, 11, 0.2);
+        }
+
+        .header {
+            position: relative;
+            padding: 12px;
+            text-align: center;
+            background: #450a0a;
+            border-bottom: 2px solid #f59e0b;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .header h1 {
+            font-family: 'ZCOOL KuaiLe', sans-serif;
+            color: #f59e0b;
+            font-size: 1.4rem;
+            margin: 0;
+            text-shadow: 2px 2px 4px black;
+            letter-spacing: 1px;
+        }
+
+        .home-btn {
+            position: absolute;
+            left: 15px;
+            background: #f59e0b;
+            color: #450a0a;
+            padding: 5px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #fff;
+        }
+
+        .home-btn:active {
+            transform: scale(0.9);
+        }
+
+        .multiplier-bar {
+            display: flex;
+            justify-content: space-around;
+            padding: 8px;
+            background: rgba(0,0,0,0.6);
+        }
+
+        .multiplier {
+            font-weight: bold;
+            font-size: 1rem;
+            color: #64748b;
+            transition: all 0.3s;
+        }
+
+        .multiplier.active {
+            color: #f59e0b;
+            transform: scale(1.25);
+            text-shadow: 0 0 12px #f59e0b;
+        }
+
+        canvas {
+            width: 100%;
+            flex-grow: 1;
+            background: #0f172a;
+        }
+
+        /* Control Panel */
+        .control-panel {
+            background: #0f172a;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            border-top: 2px solid #334155;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1.2fr 1fr;
+            gap: 8px;
+        }
+
+        .stat-card {
+            background: #1e293b;
+            padding: 6px;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid #4338ca;
+        }
+
+        .stat-label { font-size: 0.6rem; color: #94a3b8; text-transform: uppercase; }
+        .stat-value { font-size: 0.85rem; font-weight: bold; color: #fbbf24; }
+
+        .main-btns {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 10px;
+        }
+
+        .btn-round {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: #334155;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            border: 2px solid #475569;
+            transition: all 0.2s;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+
+        .btn-round:active { transform: scale(0.9); }
+        .btn-round.active { background: #f59e0b; color: black; border-color: white; }
+
+        .spin-btn {
+            width: 84px;
+            height: 84px;
+            background: radial-gradient(circle, #ef4444 0%, #7f1d1d 100%);
+            border: 4px solid #fca5a5;
+            border-radius: 50%;
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: white;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .spin-btn:disabled { filter: grayscale(1); opacity: 0.7; }
+
+        /* Auto Menu */
+        #auto-menu {
+            position: absolute;
+            bottom: 140px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e293b;
+            border: 2px solid #f59e0b;
+            border-radius: 12px;
+            padding: 16px;
+            display: none;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            z-index: 100;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+
+        .auto-opt {
+            background: #334155;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .auto-opt:hover { background: #475569; }
+
+        /* Win Overlay */
+        #win-overlay {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            text-align: center;
+            z-index: 50;
+            display: none;
+        }
+
+        .win-anim {
+            animation: winPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes winPop {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .auto-count-badge {
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            background: #ef4444;
+            color: white;
+            font-size: 0.7rem;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            border: 2px solid white;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div class="header">
+        <!-- Tombol Home -->
+        <div class="home-btn" onclick="goHome()">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        </div>
+        <h1>MAHJONG WAYS 2</h1>
+    </div>
+
+    <div class="multiplier-bar">
+        <div id="m1" class="multiplier active">x1</div>
+        <div id="m2" class="multiplier">x2</div>
+        <div id="m3" class="multiplier">x3</div>
+        <div id="m5" class="multiplier">x5</div>
+    </div>
+
+    <canvas id="slotCanvas"></canvas>
+
+    <!-- Overlay Kemenangan -->
+    <div id="win-overlay">
+        <div class="text-4xl font-black text-yellow-400 drop-shadow-lg font-[ZCOOL+KuaiLe]">WIN!</div>
+        <div id="win-amount-text" class="text-2xl font-bold text-white">0</div>
+    </div>
+
+    <!-- Menu Auto Spin -->
+    <div id="auto-menu">
+        <div class="auto-opt" onclick="startAuto(10)">10</div>
+        <div class="auto-opt" onclick="startAuto(20)">20</div>
+        <div class="auto-opt" onclick="startAuto(30)">30</div>
+        <div class="auto-opt" onclick="startAuto(50)">50</div>
+        <div class="auto-opt" onclick="startAuto(100)">100</div>
+        <div class="auto-opt bg-red-800" onclick="closeAuto()">X</div>
+    </div>
+
+    <!-- Kontrol -->
+    <div class="control-panel">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Saldo</div>
+                <div id="balance" class="stat-value">100.000</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Total Menang</div>
+                <div id="total-win" class="stat-value text-green-400">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Taruhan</div>
+                <div id="bet-val" class="stat-value">200</div>
+            </div>
+        </div>
+
+        <div class="main-btns">
+            <!-- Turbo -->
+            <button id="turboBtn" class="btn-round" onclick="toggleTurbo()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            </button>
+
+            <!-- Bet Control -->
+            <div class="flex items-center gap-2 bg-slate-800 rounded-full px-2 py-1">
+                <button onclick="changeBet(-200)" class="text-xl font-bold w-8 h-8 flex items-center justify-center">-</button>
+                <div class="w-12 text-center text-xs font-bold text-yellow-500">BET</div>
+                <button onclick="changeBet(200)" class="text-xl font-bold w-8 h-8 flex items-center justify-center">+</button>
+            </div>
+
+            <!-- Spin -->
+            <div class="relative">
+                <button id="spinBtn" class="spin-btn" onclick="handleSpinClick()">SPIN</button>
+                <div id="auto-badge" class="auto-count-badge">0</div>
+            </div>
+
+            <!-- Auto -->
+            <button id="autoBtn" class="btn-round" onclick="openAuto()">AUTO</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('slotCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Konfigurasi
+    const ROWS_CONFIG = [4, 5, 5, 5, 4];
+    const COLS = 5;
+    let grid = [];
+    let balance = 100000;
+    let currentBet = 200; 
+    let isSpinning = false;
+    let isTurbo = false;
+    let autoSpins = 0;
+    let multiplierIdx = 0;
+    const multipliers = [1, 2, 3, 5];
+
+    const SYMBOLS = [
+        { name: 'Red', color: '#ef4444', text: '中', val: 50 },
+        { name: 'Green', color: '#22c55e', text: '發', val: 40 },
+        { name: 'White', color: '#f1f5f9', text: '白', val: 30 },
+        { name: '8Dot', color: '#3b82f6', text: '⑧', val: 20 },
+        { name: '5Bam', color: '#10b981', text: '🀐', val: 15 },
+        { name: '2Bam', color: '#84cc16', text: '🀑', val: 10 },
+        { name: '5Dot', color: '#6366f1', text: '⑤', val: 5 },
+        { name: '2Dot', color: '#06b6d4', text: '②', val: 2 },
+    ];
+
+    function initGrid() {
+        grid = [];
+        for (let c = 0; c < COLS; c++) {
+            let col = [];
+            for (let r = 0; r < ROWS_CONFIG[c]; r++) {
+                col.push(getRandomSym());
+            }
+            grid.push(col);
+        }
+    }
+
+    function getRandomSym() {
+        if (Math.random() < 0.05) return { name: 'Wild', color: '#fbbf24', text: 'W', val: 0 };
+        const s = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+        return { ...s };
+    }
+
+    function draw() {
+        if (!grid || grid.length === 0) return;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const cw = canvas.width / COLS;
+        const ch = canvas.height / 5;
+
+        for (let c = 0; c < COLS; c++) {
+            const startY = (5 - ROWS_CONFIG[c]) * (ch / 2);
+            for (let r = 0; r < ROWS_CONFIG[c]; r++) {
+                if (!grid[c] || !grid[c][r]) continue;
+
+                const x = c * cw + 6, y = startY + r * ch + 6;
+                const w = cw - 12, h = ch - 12;
+                const sym = grid[c][r];
+
+                ctx.fillStyle = '#f8fafc';
+                ctx.beginPath();
+                if (ctx.roundRect) {
+                    ctx.roundRect(x, y, w, h, 8);
+                } else {
+                    ctx.rect(x, y, w, h);
+                }
+                ctx.fill();
+                
+                ctx.fillStyle = sym.color;
+                ctx.font = `bold ${h * 0.5}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(sym.text, x + w/2, y + h/2);
+
+                if(sym.name === 'Wild') {
+                    ctx.strokeStyle = 'gold';
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(x+2, y+2, w-4, h-4);
+                }
+            }
+        }
+    }
+
+    function goHome() {
+        // Logika sederhana untuk me-reset atau mengarahkan (dalam demo ini hanya alert)
+        if (isSpinning) return;
+        if(confirm("Apakah Anda ingin kembali ke menu utama?")) {
+            location.reload();
+        }
+    }
+
+    async function handleSpinClick() {
+        if (autoSpins > 0) {
+            stopAuto();
+            return;
+        }
+        startSpin();
+    }
+
+    async function startSpin() {
+        if (isSpinning || balance < currentBet) return;
+        
+        isSpinning = true;
+        document.getElementById('spinBtn').disabled = true;
+        balance -= currentBet;
+        multiplierIdx = 0;
+        updateUI();
+
+        const spins = isTurbo ? 5 : 15;
+        for (let i = 0; i < spins; i++) {
+            initGrid();
+            draw();
+            await new Promise(r => setTimeout(r, isTurbo ? 30 : 60));
+        }
+
+        await processWin();
+    }
+
+    async function processWin() {
+        let cycleWin = true;
+        let totalWinThisSpin = 0;
+
+        while(cycleWin) {
+            const wins = findWins();
+            if (wins.length > 0) {
+                const winAmount = wins.length * (currentBet / 10) * multipliers[multiplierIdx];
+                totalWinThisSpin += winAmount;
+                
+                showWin(winAmount);
+                await new Promise(r => setTimeout(r, isTurbo ? 200 : 500));
+                
+                removeWins(wins);
+                draw();
+                await new Promise(r => setTimeout(r, isTurbo ? 100 : 200));
+                
+                fillGrid();
+                draw();
+                
+                if (multiplierIdx < multipliers.length - 1) multiplierIdx++;
+                updateUI();
+                await new Promise(r => setTimeout(r, isTurbo ? 100 : 200));
+            } else {
+                cycleWin = false;
+            }
+        }
+
+        if (totalWinThisSpin > 0) {
+            balance += totalWinThisSpin;
+            document.getElementById('total-win').innerText = totalWinThisSpin.toLocaleString();
+        }
+
+        isSpinning = false;
+        document.getElementById('spinBtn').disabled = false;
+        updateUI();
+
+        if (autoSpins > 0) {
+            autoSpins--;
+            updateUI();
+            if (autoSpins > 0 && balance >= currentBet) {
+                setTimeout(startSpin, 800);
+            } else {
+                stopAuto();
+            }
+        }
+    }
+
+    function findWins() {
+        let matches = [];
+        if (!grid[0]) return matches;
+
+        const firstCol = [...new Set(grid[0].map(s => s.name))];
+        firstCol.forEach(name => {
+            if (name === 'Wild') return;
+            let path = [];
+            for(let c = 0; c < COLS; c++) {
+                let found = [];
+                for(let r = 0; r < ROWS_CONFIG[c]; r++) {
+                    if(grid[c] && grid[c][r] && (grid[c][r].name === name || grid[c][r].name === 'Wild')) {
+                        found.push({c,r});
+                    }
+                }
+                if(found.length > 0) path.push(found);
+                else break;
+            }
+            if(path.length >= 3) path.forEach(f => matches.push(...f));
+        });
+        return matches;
+    }
+
+    function removeWins(wins) {
+        wins.sort((a,b) => b.r - a.r);
+        wins.forEach(w => {
+            if (grid[w.c]) grid[w.c].splice(w.r, 1);
+        });
+    }
+
+    function fillGrid() {
+        for(let c = 0; c < COLS; c++) {
+            while(grid[c] && grid[c].length < ROWS_CONFIG[c]) {
+                grid[c].unshift(getRandomSym());
+            }
+        }
+    }
+
+    function updateUI() {
+        document.getElementById('balance').innerText = balance.toLocaleString();
+        document.getElementById('bet-val').innerText = currentBet.toLocaleString();
+        
+        document.querySelectorAll('.multiplier').forEach(m => m.classList.remove('active'));
+        const mEl = document.getElementById('m' + multipliers[multiplierIdx]);
+        if (mEl) mEl.classList.add('active');
+
+        const badge = document.getElementById('auto-badge');
+        const spinBtnEl = document.getElementById('spinBtn');
+        if (autoSpins > 0) {
+            badge.style.display = 'flex';
+            badge.innerText = autoSpins;
+            spinBtnEl.innerText = "STOP";
+        } else {
+            badge.style.display = 'none';
+            spinBtnEl.innerText = "SPIN";
+        }
+    }
+
+    function changeBet(amt) {
+        if (isSpinning) return;
+        currentBet += amt;
+        if (currentBet < 200) currentBet = 200;
+        if (currentBet > 50000) currentBet = 50000;
+        updateUI();
+    }
+
+    function toggleTurbo() {
+        isTurbo = !isTurbo;
+        document.getElementById('turboBtn').classList.toggle('active', isTurbo);
+    }
+
+    function openAuto() { 
+        if(!isSpinning) document.getElementById('auto-menu').style.display = 'grid'; 
+    }
+    
+    function closeAuto() { 
+        document.getElementById('auto-menu').style.display = 'none'; 
+    }
+    
+    function startAuto(n) {
+        autoSpins = n;
+        closeAuto();
+        updateUI();
+        startSpin();
+    }
+
+    function stopAuto() {
+        autoSpins = 0;
+        updateUI();
+    }
+
+    function showWin(amt) {
+        const overlay = document.getElementById('win-overlay');
+        const winText = document.getElementById('win-amount-text');
+        if (winText) winText.innerText = amt.toLocaleString();
+        overlay.style.display = 'block';
+        overlay.classList.add('win-anim');
+        setTimeout(() => {
+            overlay.style.display = 'none';
+            overlay.classList.remove('win-anim');
+        }, 1500);
+    }
+
+    window.addEventListener('load', () => {
+        canvas.width = canvas.parentElement.clientWidth;
+        canvas.height = canvas.parentElement.clientHeight * 0.55;
+        initGrid();
+        draw();
+        updateUI();
+    });
+
+    window.addEventListener('resize', () => {
+        canvas.width = canvas.parentElement.clientWidth;
+        canvas.height = canvas.parentElement.clientHeight * 0.55;
+        draw();
+    });
+
+    if (!CanvasRenderingContext2D.prototype.roundRect) {
+        CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+            this.beginPath();
+            this.moveTo(x + r, y);
+            this.arcTo(x + w, y, x + w, y + h, r);
+            this.arcTo(x + w, y + h, x, y + h, r);
+            this.arcTo(x, y + h, x, y, r);
+            this.arcTo(x, y, x + w, y, r);
+            this.closePath();
+            return this;
+        };
+    }
+</script>
+</body>
+</html>
