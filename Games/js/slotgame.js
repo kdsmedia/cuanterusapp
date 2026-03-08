@@ -70,6 +70,9 @@
         this.load.image("blackberry", "assets/Blackberry.png");
         this.load.image("cherry", "assets/Cherry.png");
         
+        // preload mask
+        this.load.image("mask", "assets/mask.png");
+
         // preload cheat tool assets
         this.load.image("arrow", "assets/Arrow.png");
         this.load.image("ctBackground", "assets/CheatToolBackground.png");
