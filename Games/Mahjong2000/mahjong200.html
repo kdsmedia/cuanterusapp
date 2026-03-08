@@ -1,4 +1,4 @@
-<!DOCTYPE l/ctag/span>
+<!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
@@ -65,7 +65,10 @@
             grid-template-columns: repeat(5, 1fr);
             gap: 5px;
             overflow: hidden; /* Penting: Hanya menampilkan area 5x5 */
-            flex-grow: 1; /* Memastikan grid mengisi ruang yang tersedia */
+            /* Tinggi grid = 5 tile persegi + 4 gap, dihitung dari lebar kolom */
+            aspect-ratio: 1 / 1;
+            width: 100%;
+            max-height: 100%;
         }
 
         /* Container untuk satu reel (kolom) - Menyembunyikan simbol yang berputar */
@@ -87,11 +90,11 @@
             will-change: transform;
         }
 
-        /* Gaya Tile */
+        /* Gaya Tile — 1:1 persegi */
         .tile {
-            height: calc((100% - 4 * 5px) / 5); /* Tinggi 1/5 dari kolom dikurangi 4 gap */
-            margin-bottom: 5px; /* Gap antar tile */
             width: 100%;
+            aspect-ratio: 1 / 1; /* Kunci rasio 1:1 */
+            margin-bottom: 5px; /* Gap antar tile */
             background-color: #f0f0f0;
             border-radius: 8px;
             display: flex;
@@ -103,6 +106,7 @@
             box-shadow: inset 0 -4px 0 #ccc, 0 2px 4px rgba(0, 0, 0, 0.3);
             flex-shrink: 0; /* Penting untuk flex-col */
             padding: 3px;
+            overflow: hidden;
             transition: opacity 0.3s ease-out, transform 0.3s ease-out; /* Untuk animasi Tumble */
         }
         .reel .tile:last-child {
@@ -138,6 +142,7 @@
         .symbol-container {
             width: 100%;
             height: 100%;
+            aspect-ratio: 1 / 1;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -146,13 +151,12 @@
             position: relative;
         }
 
-        /* Gaya untuk semua gambar di dalam simbol (Full Size) */
+        /* Gaya untuk semua gambar di dalam simbol (1:1 persegi) */
         .symbol-container img {
-            max-width: 100%;
-            max-height: 100%;
-            width: 100%; 
-            height: 100%; 
-            object-fit: cover;
+            width: 100%;
+            height: 100%;
+            aspect-ratio: 1 / 1;
+            object-fit: contain; /* Muat tanpa distorsi */
             border-radius: 4px;
             filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5));
             image-rendering: optimizeQuality;
@@ -386,17 +390,17 @@
     // Definisikan Simbol Slot Kustom
     const SYMBOLS = [
         // 8 Simbol Bernilai Sangat Rendah (0.5x bet untuk 3-of-a-kind) - Index 0-7
-        { code: '<img src="https://placehold.co/40x40/FFD700/000000/png?text=A" alt="Tile A">', class: 'symbol-img', type: 'img', value: 0.5, symbolId: 'tile_a' },
-        { code: '<img src="https://placehold.co/40x40/FF0000/FFFFFF/png?text=B" alt="Tile B">', class: 'symbol-img', type: 'img', value: 0.5, symbolId: 'tile_b' },
-        { code: '<img src="https://placehold.co/40x40/0000FF/FFFFFF/png?text=C" alt="Tile C">', class: 'symbol-img', type: 'img', value: 0.5, symbolId: 'tile_c' },
-        { code: '<img src="https://placehold.co/40x40/008000/FFFFFF/png?text=D" alt="Tile D">', class: 'symbol-img', type: 'img', value: 0.5, symbolId: 'tile_d' },
-        { code: '<img src="https://placehold.co/40x40/FFA500/000000/png?text=E" alt="Tile E">', class: 'symbol-img', type: 'img', value: 1, symbolId: 'tile_e' }, 
-        { code: '<img src="https://placehold.co/40x40/800080/FFFFFF/png?text=F" alt="Tile F">', class: 'symbol-img', type: 'img', value: 1, symbolId: 'tile_f' }, 
-        { code: '<img src="https://placehold.co/40x40/40E0D0/000000/png?text=G" alt="Tile G">', class: 'symbol-img', type: 'img', value: 2, symbolId: 'tile_g' }, 
-        { code: '<img src="https://placehold.co/40x40/212121/FFFFFF/png?text=H" alt="Tile H">', class: 'symbol-img', type: 'img', value: 3, symbolId: 'tile_h' }, 
+        { code: '<img src="https://placehold.co/80x80/FFD700/000000/png?text=A" alt="Tile A">', class: 'symbol-img', type: 'img', value: 0.5, symbolId: 'tile_a' },
+        { code: '<img src="https://placehold.co/80x80/FF0000/FFFFFF/png?text=B" alt="Tile B">', class: 'symbol-img', type: 'img', value: 0.5, symbolId: 'tile_b' },
+        { code: '<img src="https://placehold.co/80x80/0000FF/FFFFFF/png?text=C" alt="Tile C">', class: 'symbol-img', type: 'img', value: 0.5, symbolId: 'tile_c' },
+        { code: '<img src="https://placehold.co/80x80/008000/FFFFFF/png?text=D" alt="Tile D">', class: 'symbol-img', type: 'img', value: 0.5, symbolId: 'tile_d' },
+        { code: '<img src="https://placehold.co/80x80/FFA500/000000/png?text=E" alt="Tile E">', class: 'symbol-img', type: 'img', value: 1, symbolId: 'tile_e' }, 
+        { code: '<img src="https://placehold.co/80x80/800080/FFFFFF/png?text=F" alt="Tile F">', class: 'symbol-img', type: 'img', value: 1, symbolId: 'tile_f' }, 
+        { code: '<img src="https://placehold.co/80x80/40E0D0/000000/png?text=G" alt="Tile G">', class: 'symbol-img', type: 'img', value: 2, symbolId: 'tile_g' }, 
+        { code: '<img src="https://placehold.co/80x80/212121/FFFFFF/png?text=H" alt="Tile H">', class: 'symbol-img', type: 'img', value: 3, symbolId: 'tile_h' }, 
 
         // WILD (Pengganti) - Index 8
-        { code: '<img src="https://placehold.co/40x40/FFC300/660708/png?text=WILD" alt="Wild Ingot">', class: 'symbol-img', type: 'img', value: 50, symbolId: WILD_ID },
+        { code: '<img src="https://placehold.co/80x80/FFC300/660708/png?text=WILD" alt="Wild Ingot">', class: 'symbol-img', type: 'img', value: 50, symbolId: WILD_ID },
         
         // Simbol Pengali (Nilai Tinggi) - Index 9-12
         { code: 'X1', class: 'symbol-multiplier x1', type: 'text', value: 10, symbolId: 'mult_x1' },
@@ -508,20 +512,22 @@
             gameGrid.appendChild(reelContainer);
         }
         
-        const tempTile = document.getElementById('reel-0')?.querySelector('.tile');
-        if (tempTile) {
-            tileStepHeight = tempTile.offsetHeight + TILE_GAP; 
-            
-            for (let r = 0; r < REEL_COUNT; r++) {
-                const reel = document.getElementById(`reel-${r}`);
-                if (reel) {
-                    const initialOffset = BUFFER_TILES * tileStepHeight; 
-                    reel.style.transform = `translateY(-${initialOffset}px)`;
+        // Tunggu layout selesai render agar ukuran tile terhitung benar
+        requestAnimationFrame(() => {
+            const tempTile = document.getElementById('reel-0')?.querySelector('.tile');
+            if (tempTile) {
+                tileStepHeight = tempTile.offsetHeight + TILE_GAP; 
+                
+                for (let r = 0; r < REEL_COUNT; r++) {
+                    const reel = document.getElementById(`reel-${r}`);
+                    if (reel) {
+                        const initialOffset = BUFFER_TILES * tileStepHeight; 
+                        reel.style.transform = `translateY(-${initialOffset}px)`;
+                    }
                 }
             }
-        }
-        
-        updateDisplay();
+            updateDisplay();
+        });
     }
 
     // --- FUNGSI KONTROL PUTARAN ---
