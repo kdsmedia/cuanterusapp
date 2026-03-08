@@ -10,7 +10,7 @@ import {
   Dimensions,
   Vibration,
 } from 'react-native';
-import { Audio } from 'expo-av';
+import { useAudioPlayer } from 'expo-audio';
 import { useAuth } from '@/lib/auth-context';
 import {
   claimSpinReward, getSpinCountToday,
@@ -24,46 +24,24 @@ const WHEEL_SIZE = Math.min(Dimensions.get('window').width - 48, 320);
 const NUM_SEGMENTS = SPIN_PRIZES.length; // 20
 const SEGMENT_ANGLE = 360 / NUM_SEGMENTS; // 18°
 
-// ===== SOUND EFFECTS =====
-let tickSound: Audio.Sound | null = null;
-let winSound: Audio.Sound | null = null;
+// ===== SOUND HELPERS (using expo-audio) =====
+let tickPlayer: ReturnType<typeof useAudioPlayer> | null = null;
+let winPlayer: ReturnType<typeof useAudioPlayer> | null = null;
 
-async function loadSounds() {
+function playTick() {
   try {
-    await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
-
-    // Tick sound - generate from a short beep
-    const { sound: tick } = await Audio.Sound.createAsync(
-      { uri: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3' },
-      { shouldPlay: false, volume: 0.3 }
-    );
-    tickSound = tick;
-
-    // Win sound
-    const { sound: win } = await Audio.Sound.createAsync(
-      { uri: 'https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3' },
-      { shouldPlay: false, volume: 0.6 }
-    );
-    winSound = win;
-  } catch (e) {
-    console.log('[Spin] Failed to load sounds:', e);
-  }
-}
-
-async function playTick() {
-  try {
-    if (tickSound) {
-      await tickSound.setPositionAsync(0);
-      await tickSound.playAsync();
+    if (tickPlayer) {
+      tickPlayer.seekTo(0);
+      tickPlayer.play();
     }
   } catch (_) {}
 }
 
-async function playWin() {
+function playWin() {
   try {
-    if (winSound) {
-      await winSound.setPositionAsync(0);
-      await winSound.playAsync();
+    if (winPlayer) {
+      winPlayer.seekTo(0);
+      winPlayer.play();
     }
     Vibration.vibrate([0, 100, 50, 100, 50, 200]);
   } catch (_) {}
@@ -83,12 +61,18 @@ export default function SpinScreen() {
   const spinsLeft = MAX_DAILY_SPINS - spinsToday;
   const maxedOut = spinsToday >= MAX_DAILY_SPINS;
 
-  // Load sounds on mount
+  // Load sounds using expo-audio hooks
+  tickPlayer = useAudioPlayer(
+    { uri: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3' },
+    { volume: 0.3 }
+  );
+  winPlayer = useAudioPlayer(
+    { uri: 'https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3' },
+    { volume: 0.6 }
+  );
+
   useEffect(() => {
-    loadSounds();
     return () => {
-      tickSound?.unloadAsync();
-      winSound?.unloadAsync();
       if (tickInterval.current) clearInterval(tickInterval.current);
     };
   }, []);
