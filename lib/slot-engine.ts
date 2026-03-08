@@ -170,7 +170,7 @@ function getGameConfig(gameId: string, balance: number): SlotGameConfig {
     symbolNames: theme.symbolNames || ['Diamond', 'Bell', 'Cherry', 'Lemon', 'Orange', 'Grape', 'Seven', 'Ace', 'King', 'Queen', 'Star'],
     reelCount: theme.reelCount || 5,
     rowCount: theme.rowCount || 3,
-    bets: [10, 20, 50, 100, 200, 500],
+    bets: [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000],
     paytable: {},
     wildSymbol: 0,
     scatterSymbol: (theme.symbols || []).length - 1,
