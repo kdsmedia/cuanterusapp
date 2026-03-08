@@ -21,7 +21,7 @@ import {
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
-import { auth, db, USERS_PATH, CHECKIN_REWARD, REFERRAL_REWARD } from './firebase';
+import { auth, db, USERS_PATH, CHECKIN_REWARD, REFERRAL_REWARD, APP_ID } from './firebase';
 
 export const WATCH_AD_REWARD = 50;
 export const MAX_DAILY_ADS = 20;
@@ -441,6 +441,37 @@ export async function adminBlockUser(uid: string, blocked: boolean) {
   await updateDoc(doc(db, USERS_PATH, uid), { blocked });
 }
 
+/** Admin: hapus akun pengguna (soft delete — hapus dari Firestore) */
+export async function adminDeleteUser(uid: string): Promise<void> {
+  const { deleteDoc: delDoc } = await import('firebase/firestore');
+  // Hapus dokumen user
+  await delDoc(doc(db, USERS_PATH, uid));
+  // Hapus game sessions jika ada
+  try {
+    const sessRef = doc(db, `artifacts/${APP_ID}/public/data/gameSessions`, uid);
+    await delDoc(sessRef);
+  } catch (_) {}
+}
+
+/** Admin: update profil pengguna */
+export async function adminUpdateUserProfile(uid: string, updates: {
+  name?: string;
+  email?: string;
+  phone?: string;
+  ewalletId?: string;
+  ewalletName?: string;
+  ewalletOwner?: string;
+  ewalletNumber?: string;
+}): Promise<void> {
+  // Filter out undefined values
+  const clean: Record<string, any> = {};
+  for (const [k, v] of Object.entries(updates)) {
+    if (v !== undefined && v !== null) clean[k] = v;
+  }
+  if (Object.keys(clean).length === 0) return;
+  await updateDoc(doc(db, USERS_PATH, uid), clean);
+}
+
 export async function adminApproveWithdrawal(docId: string) {
   const ref = doc(db, WITHDRAWALS_PATH, docId);
   await updateDoc(ref, { status: 'approved' });
@@ -736,11 +767,66 @@ export function getYoutubeWatchCount(userData: any): number {
 
 export const PIGGY_BANK_TARGET = 10000; // Target tabungan Rp 10.000
 export const PIGGY_BANK_BONUS = 1000;   // Bonus pecah celengan Rp 1.000
+export const PIGGY_BANK_INTEREST_RATE = 0.0001; // 0.01% bunga harian
 
-export function getPiggyBankData(userData: any): { saved: number; progress: number; canBreak: boolean } {
+export function getPiggyBankData(userData: any): {
+  saved: number;
+  progress: number;
+  canBreak: boolean;
+  pendingInterest: number;
+  lastInterestDate: string;
+} {
   const saved = userData?.piggyBank || 0;
   const progress = Math.min((saved / PIGGY_BANK_TARGET) * 100, 100);
-  return { saved, progress, canBreak: saved >= PIGGY_BANK_TARGET };
+  const lastInterestDate = userData?.piggyLastInterest || '';
+  const today = new Date().toDateString();
+
+  // Hitung bunga pending (belum diklaim hari ini)
+  let pendingInterest = 0;
+  if (saved > 0 && lastInterestDate !== today) {
+    // Hitung berapa hari sejak terakhir klaim bunga
+    const daysSinceLast = lastInterestDate
+      ? Math.max(1, Math.floor((Date.now() - new Date(lastInterestDate).getTime()) / 86400000))
+      : 1;
+    pendingInterest = Math.floor(saved * PIGGY_BANK_INTEREST_RATE * daysSinceLast);
+  }
+
+  return { saved, progress, canBreak: saved >= PIGGY_BANK_TARGET, pendingInterest, lastInterestDate };
+}
+
+/** Klaim bunga harian celengan (0.01% per hari) */
+export async function claimPiggyInterest(uid: string): Promise<string> {
+  const userRef = doc(db, USERS_PATH, uid);
+  const snap = await getDoc(userRef);
+  if (!snap.exists()) throw new Error('User tidak ditemukan');
+
+  const data = snap.data();
+  const saved = data.piggyBank || 0;
+  if (saved <= 0) throw new Error('Celengan kosong, tidak ada bunga.');
+
+  const today = new Date().toDateString();
+  const lastInterest = data.piggyLastInterest || '';
+  if (lastInterest === today) throw new Error('Bunga sudah diklaim hari ini.');
+
+  // Hitung hari
+  const daysSinceLast = lastInterest
+    ? Math.max(1, Math.floor((Date.now() - new Date(lastInterest).getTime()) / 86400000))
+    : 1;
+  const interest = Math.floor(saved * PIGGY_BANK_INTEREST_RATE * daysSinceLast);
+
+  if (interest <= 0) throw new Error('Bunga terlalu kecil untuk diklaim (< Rp 1).');
+
+  // Bunga masuk ke celengan (bukan saldo)
+  await updateDoc(userRef, {
+    piggyBank: increment(interest),
+    totalEarned: increment(interest),
+    piggyLastInterest: today,
+  });
+
+  await logTransaction(uid, 'piggy_interest', interest,
+    `Bunga celengan 0.01% × ${daysSinceLast} hari = Rp ${interest.toLocaleString('id-ID')}`);
+
+  return `💰 Bunga Rp ${interest.toLocaleString('id-ID')} ditambahkan ke celengan! (${daysSinceLast} hari)`;
 }
 
 /** Simpan ke celengan (ambil dari saldo) */

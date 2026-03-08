@@ -12,8 +12,8 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/lib/auth-context';
 import {
   claimVoucher, getUserLevel, MAX_DAILY_SPINS, getSpinCountToday,
-  getPiggyBankData, saveToPiggyBank, breakPiggyBank,
-  PIGGY_BANK_TARGET, PIGGY_BANK_BONUS,
+  getPiggyBankData, saveToPiggyBank, breakPiggyBank, claimPiggyInterest,
+  PIGGY_BANK_TARGET, PIGGY_BANK_BONUS, PIGGY_BANK_INTEREST_RATE,
 } from '@/lib/api';
 import { sendLocalNotification } from '@/lib/permissions';
 import GlassCard from '@/components/GlassCard';
@@ -36,6 +36,19 @@ export default function BonusScreen() {
   const spinsLeft = MAX_DAILY_SPINS - spinsToday;
 
   // ===== PIGGY BANK =====
+  const handleClaimInterest = async () => {
+    if (!firebaseUser) return;
+    setPiggyLoading(true);
+    try {
+      const msg = await claimPiggyInterest(firebaseUser.uid);
+      setToast({ visible: true, message: msg, type: 'success' });
+    } catch (e: any) {
+      setToast({ visible: true, message: e.message, type: 'warning' });
+    } finally {
+      setPiggyLoading(false);
+    }
+  };
+
   const handlePiggySave = async () => {
     if (!firebaseUser) return;
     const amount = parseInt(piggyAmount);
@@ -199,10 +212,38 @@ export default function BonusScreen() {
             </View>
           )}
 
+          {/* Interest info */}
+          {piggy.saved > 0 && (
+            <View style={styles.interestRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.interestLabel}>📈 Bunga 0.01%/hari</Text>
+                {piggy.pendingInterest > 0 ? (
+                  <Text style={styles.interestAmount}>
+                    +Rp {piggy.pendingInterest.toLocaleString('id-ID')} tersedia
+                  </Text>
+                ) : (
+                  <Text style={[styles.interestAmount, { color: colors.textMuted }]}>
+                    Sudah diklaim hari ini ✅
+                  </Text>
+                )}
+              </View>
+              {piggy.pendingInterest > 0 && (
+                <TouchableOpacity
+                  style={styles.interestBtn}
+                  onPress={handleClaimInterest}
+                  disabled={piggyLoading}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.interestBtnText}>KLAIM</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
           <Text style={styles.piggyInfo}>
             {piggy.canBreak
               ? `🎉 Celengan penuh! Pecahkan untuk dapat bonus Rp ${PIGGY_BANK_BONUS.toLocaleString('id-ID')}!`
-              : `Tabung saldo ke celengan. Penuh = bonus Rp ${PIGGY_BANK_BONUS.toLocaleString('id-ID')}!`
+              : `Tabung saldo ke celengan. Penuh = bonus Rp ${PIGGY_BANK_BONUS.toLocaleString('id-ID')}! + bunga 0.01%/hari`
             }
           </Text>
         </GlassCard>
@@ -441,6 +482,38 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     color: '#0f172a',
+  },
+  interestRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16,185,129,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(16,185,129,0.15)',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 14,
+  },
+  interestLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.green,
+  },
+  interestAmount: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.green,
+    marginTop: 2,
+  },
+  interestBtn: {
+    backgroundColor: colors.green,
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  interestBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#fff',
   },
   piggyInfo: {
     fontSize: 11,
