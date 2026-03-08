@@ -14,39 +14,49 @@
     let _spinCtr = 0;
 
     const _reels = [];
-    const _reelsCount = 3;
-    const _reelStartPosition = { x: 580, y: 500 };
-    const _reelsDuration = [1000, 1500, 2000];
+    const _reelsCount = 5;
+    const _reelStartPosition = { x: 360, y: 500 };
+    const _reelsDuration = [800, 1100, 1400, 1700, 2000];
     const _symbolKeys = ["banana", "blackberry", "cherry"];
 
     const _reelStrips1 = [
         [_symbolKeys[0], _symbolKeys[1], _symbolKeys[2], _symbolKeys[2], _symbolKeys[1], _symbolKeys[1], _symbolKeys[1], _symbolKeys[1], _symbolKeys[2], _symbolKeys[0], _symbolKeys[1], _symbolKeys[2], _symbolKeys[0]],
         [_symbolKeys[1], _symbolKeys[2], _symbolKeys[1], _symbolKeys[2], _symbolKeys[0], _symbolKeys[1], _symbolKeys[0], _symbolKeys[1], _symbolKeys[2], _symbolKeys[0], _symbolKeys[2], _symbolKeys[0], _symbolKeys[1]],
-        [_symbolKeys[2], _symbolKeys[0], _symbolKeys[1], _symbolKeys[2], _symbolKeys[0], _symbolKeys[1], _symbolKeys[1], _symbolKeys[0], _symbolKeys[1], _symbolKeys[0], _symbolKeys[0], _symbolKeys[1], _symbolKeys[2]]
+        [_symbolKeys[2], _symbolKeys[0], _symbolKeys[1], _symbolKeys[2], _symbolKeys[0], _symbolKeys[1], _symbolKeys[1], _symbolKeys[0], _symbolKeys[1], _symbolKeys[0], _symbolKeys[0], _symbolKeys[1], _symbolKeys[2]],
+        [_symbolKeys[1], _symbolKeys[0], _symbolKeys[2], _symbolKeys[1], _symbolKeys[2], _symbolKeys[0], _symbolKeys[1], _symbolKeys[2], _symbolKeys[0], _symbolKeys[1], _symbolKeys[0], _symbolKeys[2], _symbolKeys[1]],
+        [_symbolKeys[2], _symbolKeys[1], _symbolKeys[0], _symbolKeys[0], _symbolKeys[1], _symbolKeys[2], _symbolKeys[0], _symbolKeys[1], _symbolKeys[1], _symbolKeys[2], _symbolKeys[1], _symbolKeys[0], _symbolKeys[2]]
     ];
 
     const _reelStrips2 = [
         [_symbolKeys[1], _symbolKeys[1], _symbolKeys[2], _symbolKeys[1], _symbolKeys[1], _symbolKeys[1], _symbolKeys[0], _symbolKeys[1], _symbolKeys[2], _symbolKeys[2], _symbolKeys[1], _symbolKeys[2], _symbolKeys[1]],
         [_symbolKeys[1], _symbolKeys[2], _symbolKeys[1], _symbolKeys[1], _symbolKeys[0], _symbolKeys[1], _symbolKeys[1], _symbolKeys[1], _symbolKeys[2], _symbolKeys[2], _symbolKeys[2], _symbolKeys[0], _symbolKeys[1]],
-        [_symbolKeys[2], _symbolKeys[0], _symbolKeys[1], _symbolKeys[1], _symbolKeys[0], _symbolKeys[1], _symbolKeys[1], _symbolKeys[0], _symbolKeys[1], _symbolKeys[2], _symbolKeys[0], _symbolKeys[1], _symbolKeys[2]]
+        [_symbolKeys[2], _symbolKeys[0], _symbolKeys[1], _symbolKeys[1], _symbolKeys[0], _symbolKeys[1], _symbolKeys[1], _symbolKeys[0], _symbolKeys[1], _symbolKeys[2], _symbolKeys[0], _symbolKeys[1], _symbolKeys[2]],
+        [_symbolKeys[0], _symbolKeys[1], _symbolKeys[0], _symbolKeys[2], _symbolKeys[1], _symbolKeys[0], _symbolKeys[2], _symbolKeys[1], _symbolKeys[0], _symbolKeys[1], _symbolKeys[2], _symbolKeys[1], _symbolKeys[0]],
+        [_symbolKeys[2], _symbolKeys[0], _symbolKeys[2], _symbolKeys[1], _symbolKeys[2], _symbolKeys[0], _symbolKeys[1], _symbolKeys[0], _symbolKeys[2], _symbolKeys[0], _symbolKeys[1], _symbolKeys[2], _symbolKeys[1]]
     ];
 
     const _reelStrips3 = [
         [_symbolKeys[2], _symbolKeys[1], _symbolKeys[2], _symbolKeys[0], _symbolKeys[1], _symbolKeys[1], _symbolKeys[0], _symbolKeys[1], _symbolKeys[2], _symbolKeys[1], _symbolKeys[1], _symbolKeys[2], _symbolKeys[2]],
         [_symbolKeys[1], _symbolKeys[2], _symbolKeys[1], _symbolKeys[0], _symbolKeys[0], _symbolKeys[1], _symbolKeys[0], _symbolKeys[1], _symbolKeys[2], _symbolKeys[1], _symbolKeys[2], _symbolKeys[0], _symbolKeys[1]],
-        [_symbolKeys[1], _symbolKeys[0], _symbolKeys[1], _symbolKeys[0], _symbolKeys[0], _symbolKeys[1], _symbolKeys[1], _symbolKeys[0], _symbolKeys[1], _symbolKeys[1], _symbolKeys[0], _symbolKeys[1], _symbolKeys[1]]
+        [_symbolKeys[1], _symbolKeys[0], _symbolKeys[1], _symbolKeys[0], _symbolKeys[0], _symbolKeys[1], _symbolKeys[1], _symbolKeys[0], _symbolKeys[1], _symbolKeys[1], _symbolKeys[0], _symbolKeys[1], _symbolKeys[1]],
+        [_symbolKeys[2], _symbolKeys[1], _symbolKeys[0], _symbolKeys[1], _symbolKeys[2], _symbolKeys[0], _symbolKeys[2], _symbolKeys[1], _symbolKeys[0], _symbolKeys[2], _symbolKeys[1], _symbolKeys[0], _symbolKeys[2]],
+        [_symbolKeys[0], _symbolKeys[2], _symbolKeys[1], _symbolKeys[2], _symbolKeys[1], _symbolKeys[0], _symbolKeys[1], _symbolKeys[2], _symbolKeys[1], _symbolKeys[0], _symbolKeys[2], _symbolKeys[1], _symbolKeys[0]]
     ];
 
     const _reelStrips4 = [
         [_symbolKeys[0], _symbolKeys[1], _symbolKeys[2], _symbolKeys[1], _symbolKeys[1], _symbolKeys[1], _symbolKeys[2], _symbolKeys[1], _symbolKeys[2], _symbolKeys[0], _symbolKeys[1], _symbolKeys[2], _symbolKeys[0]],
         [_symbolKeys[0], _symbolKeys[2], _symbolKeys[1], _symbolKeys[2], _symbolKeys[0], _symbolKeys[1], _symbolKeys[2], _symbolKeys[1], _symbolKeys[2], _symbolKeys[2], _symbolKeys[2], _symbolKeys[0], _symbolKeys[0]],
-        [_symbolKeys[0], _symbolKeys[0], _symbolKeys[1], _symbolKeys[0], _symbolKeys[0], _symbolKeys[1], _symbolKeys[2], _symbolKeys[0], _symbolKeys[1], _symbolKeys[1], _symbolKeys[0], _symbolKeys[1], _symbolKeys[0]]
+        [_symbolKeys[0], _symbolKeys[0], _symbolKeys[1], _symbolKeys[0], _symbolKeys[0], _symbolKeys[1], _symbolKeys[2], _symbolKeys[0], _symbolKeys[1], _symbolKeys[1], _symbolKeys[0], _symbolKeys[1], _symbolKeys[0]],
+        [_symbolKeys[1], _symbolKeys[2], _symbolKeys[0], _symbolKeys[1], _symbolKeys[0], _symbolKeys[2], _symbolKeys[1], _symbolKeys[0], _symbolKeys[2], _symbolKeys[1], _symbolKeys[0], _symbolKeys[2], _symbolKeys[1]],
+        [_symbolKeys[2], _symbolKeys[0], _symbolKeys[1], _symbolKeys[0], _symbolKeys[2], _symbolKeys[1], _symbolKeys[0], _symbolKeys[2], _symbolKeys[0], _symbolKeys[1], _symbolKeys[2], _symbolKeys[0], _symbolKeys[1]]
     ];
 
     const _reelStrips5 = [
         [_symbolKeys[1], _symbolKeys[1], _symbolKeys[2], _symbolKeys[2], _symbolKeys[1], _symbolKeys[1], _symbolKeys[0], _symbolKeys[1], _symbolKeys[2], _symbolKeys[1], _symbolKeys[1], _symbolKeys[2], _symbolKeys[1]],
         [_symbolKeys[1], _symbolKeys[2], _symbolKeys[1], _symbolKeys[1], _symbolKeys[0], _symbolKeys[1], _symbolKeys[0], _symbolKeys[1], _symbolKeys[2], _symbolKeys[0], _symbolKeys[2], _symbolKeys[0], _symbolKeys[1]],
-        [_symbolKeys[1], _symbolKeys[0], _symbolKeys[1], _symbolKeys[2], _symbolKeys[0], _symbolKeys[1], _symbolKeys[0], _symbolKeys[0], _symbolKeys[1], _symbolKeys[1], _symbolKeys[0], _symbolKeys[1], _symbolKeys[1]]
+        [_symbolKeys[1], _symbolKeys[0], _symbolKeys[1], _symbolKeys[2], _symbolKeys[0], _symbolKeys[1], _symbolKeys[0], _symbolKeys[0], _symbolKeys[1], _symbolKeys[1], _symbolKeys[0], _symbolKeys[1], _symbolKeys[1]],
+        [_symbolKeys[0], _symbolKeys[1], _symbolKeys[2], _symbolKeys[0], _symbolKeys[1], _symbolKeys[2], _symbolKeys[1], _symbolKeys[0], _symbolKeys[2], _symbolKeys[0], _symbolKeys[1], _symbolKeys[2], _symbolKeys[0]],
+        [_symbolKeys[2], _symbolKeys[2], _symbolKeys[0], _symbolKeys[1], _symbolKeys[2], _symbolKeys[0], _symbolKeys[2], _symbolKeys[1], _symbolKeys[0], _symbolKeys[2], _symbolKeys[0], _symbolKeys[1], _symbolKeys[2]]
     ];
 
     const _reelStrips = [_reelStrips1, _reelStrips2, _reelStrips3, _reelStrips4, _reelStrips5];
@@ -119,7 +129,7 @@
                 ease: 'Linear',
                 duration: _reelsDuration[index],
                 onComplete: () => {
-                    if (index === 2)
+                    if (index === _reelsCount - 1)
                     {
                         checkIfWin();
                         _this.spinButton.clearTint();
@@ -161,7 +171,7 @@
         const randomReelStrips = _reelStrips[randomIdx];
         for (let reelIdx = 0; reelIdx < _reelsCount; reelIdx++)
         {
-            const reelContainer = _this.add.container(_reelStartPosition.x + reelIdx * 390, _reelStartPosition.y);
+            const reelContainer = _this.add.container(_reelStartPosition.x + reelIdx * 280, _reelStartPosition.y);
             for (let symbolIdx = 0; symbolIdx < randomReelStrips[reelIdx].length; symbolIdx++)
             {
                 const symbol = _this.add.sprite(0, symbolIdx * -350, randomReelStrips[reelIdx][symbolIdx]);
@@ -177,7 +187,7 @@
             key: 'mask',
             add: false
         });
-        maskImage.setDisplaySize(1150, 450);
+        maskImage.setDisplaySize(1500, 450);
 
         var mask = new Phaser.Display.Masks.BitmapMask(_this, maskImage);
         reelParentContainer.mask = mask;
