@@ -88,8 +88,8 @@ const GAME_THEMES: Record<string, Partial<SlotGameConfig>> = {
   },
   AztecGemsDeluxe: {
     displayName: 'Aztec Gems Deluxe',
-    symbols: ['🗿', '💎', '🟢', '🔴', '🔵', '🟡', '💜', '🟠'],
-    symbolNames: ['Totem', 'Diamond', 'Green', 'Red', 'Blue', 'Gold', 'Purple', 'Orange'],
+    symbols: ['🗿', '💎', '🟢', '🔴', '🔵', '🟡', '💜', '🟠', '⭐'],
+    symbolNames: ['Totem', 'Diamond', 'Green', 'Red', 'Blue', 'Gold', 'Purple', 'Orange', 'Scatter'],
     reelCount: 3,
     rowCount: 3,
     themeColor: '#059669',
@@ -360,7 +360,7 @@ body {
 
 <div class="controls">
   <div class="info-bar">
-    <div class="info-item">Bet: <span id="betDisplay">Rp 100</span></div>
+    <div class="info-item">Bet: <span id="betDisplay">Rp ${config.bets[3]?.toLocaleString('id-ID') || '100'}</span></div>
     <div class="win-display" id="winDisplay"></div>
     <div class="info-item">Lines: <span>${config.reelCount >= 5 ? '20' : '5'}</span></div>
   </div>
@@ -368,7 +368,7 @@ body {
     <button class="btn btn-home" onclick="exitGame()">🏠</button>
     <button class="btn btn-bet" id="betDown" onclick="changeBet(-1)">−</button>
     <div class="bet-section">
-      <div class="bet-value" id="betValue">100</div>
+      <div class="bet-value" id="betValue">${config.bets[3] || 100}</div>
     </div>
     <button class="btn btn-bet" id="betUp" onclick="changeBet(1)">+</button>
     <button class="btn btn-spin" id="spinBtn" onclick="spin()">SPIN</button>
@@ -387,7 +387,7 @@ const WILD_IDX = ${config.wildSymbol || 0};
 const SCATTER_IDX = ${config.scatterSymbol ?? (config.symbols.length - 1)};
 
 let balance = ${balance};
-let currentBetIdx = 2; // default 50
+let currentBetIdx = 3; // default Rp 100
 let spinning = false;
 let autoSpin = false;
 let grid = []; // [reel][row] = symbolIndex
@@ -509,11 +509,17 @@ function updateBalance(val) {
   } catch(e) {}
 }
 
+function formatBet(val) {
+  if (val >= 1000000) return (val/1000000) + 'JT';
+  if (val >= 1000) return (val/1000) + 'RB';
+  return val.toString();
+}
+
 function changeBet(dir) {
   if (spinning) return;
   currentBetIdx = Math.max(0, Math.min(BETS.length - 1, currentBetIdx + dir));
   const bet = BETS[currentBetIdx];
-  betValue.textContent = bet;
+  betValue.textContent = formatBet(bet);
   betDisplay.textContent = 'Rp ' + bet.toLocaleString('id-ID');
 }
 
@@ -606,20 +612,30 @@ function checkWins(bet) {
   for (const line of PAYLINES) {
     const symbols = line.map((row, r) => grid[r][row]);
 
-    // Find consecutive matches from left
-    const firstSym = symbols[0] === WILD_IDX && symbols[1] !== WILD_IDX ? symbols[1] : symbols[0];
-    let matchCount = 0;
-
+    // Determine the "paying" symbol (skip wilds to find the real symbol)
+    let paySymbol = -1;
     for (let i = 0; i < symbols.length; i++) {
-      if (symbols[i] === firstSym || symbols[i] === WILD_IDX) {
+      if (symbols[i] !== WILD_IDX && symbols[i] !== SCATTER_IDX) {
+        paySymbol = symbols[i];
+        break;
+      }
+    }
+    // If all wilds, pay as the best symbol
+    if (paySymbol === -1) paySymbol = WILD_IDX;
+
+    // Count consecutive matches from left
+    let matchCount = 0;
+    for (let i = 0; i < symbols.length; i++) {
+      if (symbols[i] === paySymbol || symbols[i] === WILD_IDX) {
         matchCount++;
       } else break;
     }
 
-    if (matchCount >= 3 && firstSym !== SCATTER_IDX) {
-      const mult = PAY_MULT[firstSym];
-      const payIdx = matchCount - 3; // 0=3match, 1=4match, 2=5match
-      const winMult = mult[Math.min(payIdx, mult.length - 1)];
+    // Minimum 3 matches (for both 3-reel and 5-reel games)
+    if (matchCount >= 3 && paySymbol !== SCATTER_IDX) {
+      const mult = PAY_MULT[paySymbol] || [0.5, 2, 8];
+      const payIdx = Math.min(matchCount - 3, mult.length - 1);
+      const winMult = mult[payIdx];
       const lineWin = Math.round(bet * winMult);
       if (lineWin > 0) {
         totalWin += lineWin;
@@ -630,7 +646,7 @@ function checkWins(bet) {
     }
   }
 
-  // Check scatter wins (anywhere)
+  // Check scatter wins (anywhere on reels)
   let scatterCount = 0;
   const scatterPositions = [];
   for (let r = 0; r < REEL_COUNT; r++) {
@@ -641,7 +657,8 @@ function checkWins(bet) {
       }
     }
   }
-  if (scatterCount >= 3) {
+  const minScatter = REEL_COUNT >= 5 ? 3 : 3;
+  if (scatterCount >= minScatter) {
     const scatterMult = scatterCount === 3 ? 5 : scatterCount === 4 ? 20 : 100;
     totalWin += Math.round(bet * scatterMult);
     scatterPositions.forEach(pos => winCells.add(JSON.stringify(pos)));
